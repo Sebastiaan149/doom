@@ -1,3 +1,165 @@
-html, body {
+/* This file styles the fullscreen scene, minimap overlay, and first-person HUD. */
+
+/* Base page layout keeps the game pinned to the full browser window. */
+html,
+body {
   margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #000;
+  font-family: Arial, sans-serif;
+}
+
+/* The scene container is the single mounting point for the renderer and overlays. */
+#sceneContainer {
+  position: fixed;
+  inset: 0;
+}
+
+/* The Three.js canvas fills the scene container. */
+.scene-canvas {
+  display: block;
+}
+
+/* The minimap card anchors the map in the top-right corner. */
+.maze-map-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 2px solid white;
+  border-radius: 6px;
+  z-index: 10;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+}
+
+/* The minimap header holds the title and the expand/collapse button. */
+.maze-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+/* The minimap title labels the active maze theme. */
+.maze-map-title {
+  color: white;
+  font-size: 14px;
+}
+
+/* The toggle button expands the minimap so the user can click a destination. */
+.maze-map-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.maze-map-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.maze-map-toggle:focus-visible {
+  outline: 2px solid #ffe45c;
+  outline-offset: 2px;
+}
+
+/* This wrapper stacks the static map and the dynamic player marker. */
+.maze-map-stack {
+  position: relative;
+  width: var(--collapsed-width);
+  height: var(--collapsed-height);
+  aspect-ratio: var(--map-aspect-ratio);
+}
+
+/* Expanding the minimap enlarges it and moves it to the center for easy clicking. */
+.maze-map-overlay.is-expanded {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  padding: 12px;
+  z-index: 20;
+}
+
+.maze-map-overlay.is-expanded .maze-map-stack {
+  width: min(80vw, 960px);
+  height: auto;
+  cursor: crosshair;
+}
+
+/* The base minimap uses nearest-neighbor scaling for crisp tile edges. */
+.maze-map-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* The route layer draws the selected destination and the current shortest path. */
+.maze-map-path-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.maze-map-route {
+  fill: none;
+  stroke: #ffe45c;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.65));
+}
+
+.maze-map-route-teleport {
+  fill: none;
+  stroke: rgba(255, 228, 92, 0.45);
+  stroke-linecap: round;
+  stroke-width: 2.5;
+  stroke-dasharray: 5 7;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
+}
+
+.maze-map-destination {
+  fill: #1ef29a;
+  stroke: #083d29;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The SVG player marker sits above the minimap and rotates from its center. */
+.maze-map-player-marker {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  transform-origin: center;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+}
+
+/* The controls hint explains how to enter first-person mode. */
+.controls-overlay {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  z-index: 10;
 }

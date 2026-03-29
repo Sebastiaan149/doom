@@ -2,18 +2,25 @@
 <html>
 
     <head>
+        <!-- This page loads the shared styles, Three.js, and the game scripts in dependency order. -->
         <title>Doom 3D Game</title>
         <script src="https://cdn.jsdelivr.net/npm/three@0.127.0/build/three.min.js"></script>
         <link rel="stylesheet" href="./doom_files/style.css" type="text/css" />
     </head>
 
     <body>
-        <div id="sceneContainer" style="position: absolute; width: 100%; height: 100%;">
-            <!-- The canvas will be inserted here -->
-        </div>
+        <!-- The renderer canvas and UI overlays are mounted into this container at runtime. -->
+        <div id="sceneContainer"></div>
+        <script src="./doom_files/mazeGenerator.js" type="text/javascript"></script>
+        <script src="./doom_files/mazeLayout.js" type="text/javascript"></script>
+        <script src="./doom_files/mazePathfinding.js" type="text/javascript"></script>
+        <script src="./doom_files/collisionOctree.js" type="text/javascript"></script>
+        <script src="./doom_files/mazeOverlay.js" type="text/javascript"></script>
+        <script src="./doom_files/maze3dWorld.js" type="text/javascript"></script>
+        <script src="./doom_files/rendering.js" type="text/javascript"></script>
+        <script src="./doom_files/gameLoop.js" type="text/javascript"></script>
+        <script src="./doom_files/playerController.js" type="text/javascript"></script>
+        <script src="./doom_files/doom.js" type="text/javascript"></script>
     </body>
-    <script src="./doom_files/mazeGenerator.js" type="text/javascript"></script>
-    <script src="./doom_files/maze3dWorld.js" type="text/javascript"></script>
-    <script src="./doom_files/doom.js" type="text/javascript"></script>
 
 </html>

@@ -1,4 +1,8 @@
-// This function helps to build a 3D maze representation of the original 2D maze structure.
+// This file converts the generated 2D maze data into meshes placed in the 3D world.
+// It is the bridge between the abstract maze data (`cells`, `start`, `goal`, teleports) and
+// the concrete Three.js scene graph used for rendering and collision.
+
+// Builds the visible floors, walls, and teleport markers for a generated maze.
 // TODO: change this with textures
 function buildMazeWorldFromData(maze, options = {})
 {
@@ -9,21 +13,23 @@ function buildMazeWorldFromData(maze, options = {})
         throw new Error("buildMazeWorldFromData requires options.scene");
     }
 
-    // Configuration options with default values
-    const tileSize = options.tileSize ?? 2;
-    const wallHeight = options.wallHeight ?? 3;
-    const floorThickness = options.floorThickness ?? 0.2;
-    const floorY = options.floorY ?? -3;
-    const wallY = floorY + wallHeight / 2;
+    const layout = createMazeLayout(maze, options);
+
+    const tileSize = layout.tileSize;
+    const wallHeight = layout.wallHeight;
+    const floorThickness = layout.floorThickness;
+    const floorY = layout.floorY;
+    const wallY = layout.wallY;
+
+    // Teleport spheres float slightly above the floor so they read as interactable markers
+    // instead of being visually merged into the ground plane.
     const sphereRadius = options.teleportSphereRadius ?? tileSize * 0.28;  // sphere is temporarily used to visualize the transportation points.
     const sphereY = floorY + floorThickness / 2 + sphereRadius + 0.08;
-
-    const centerX = (maze.width * tileSize) / 2 - tileSize / 2;
-    const centerZ = (maze.height * tileSize) / 2 - tileSize / 2;
 
     // This group will hold all the maze-related meshes, making it easier to manage them as a single unit in the scene.
     const group = new THREE.Group();  // Likely to change when handling collisions
     group.name = "mazeWorld";
+    group.userData.mazeLayout = layout;
 
     //const floorGeometry = new THREE.BoxGeometry(tileSize, floorThickness, tileSize);
     const floorGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
@@ -133,21 +139,13 @@ function buildMazeWorldFromData(maze, options = {})
         return teleportMaterialCache.get(colorKey);
     }
 
-    function gridToWorldX(x)
-    {
-        return x * tileSize - centerX;
-    }
-
-    function gridToWorldZ(y)
-    {
-        return y * tileSize - centerZ;
-    }
-
+    // Resolves the display color for a wall cell based on its material.
     function getWallColor(currentCell)
     {
         return wallColorMap[currentCell.wallMaterial] ?? "#ff00ff";
     }
 
+    // Resolves the display color for a floor cell, including special start/goal tiles.
     function getFloorColor(currentCell)
     {
         if (currentCell.special === "start")
@@ -169,11 +167,9 @@ function buildMazeWorldFromData(maze, options = {})
         const material = getStandardMaterial(getFloorColor(currentCell));
         const mesh = new THREE.Mesh(floorGeometry, material);
 
-        mesh.position.set(
-            gridToWorldX(x),
-            floorY,
-            gridToWorldZ(y)
-        );
+        // Every tile occupies a predictable centered position in world space. Reusing the layout
+        // helper keeps mesh placement aligned with collision and minimap math.
+        mesh.position.copy(layout.gridToWorldPosition(x, y, floorY));
 
         if (currentCell.special === "start")
         {
@@ -195,16 +191,34 @@ function buildMazeWorldFromData(maze, options = {})
         const material = getStandardMaterial(getWallColor(currentCell));
         const mesh = new THREE.Mesh(wallGeometry, material);
 
-        mesh.position.set(
-            gridToWorldX(x),
-            wallY,
-            gridToWorldZ(y)
-        );
+        mesh.position.copy(layout.gridToWorldPosition(x, y, wallY));
 
         //mesh.castShadow = true;
         //mesh.receiveShadow = true;
 
         return mesh;
+    }
+
+    // Creates the animated teleport marker mesh for one linked teleport cell.
+    function createTeleportMesh(x, y, currentCell)
+    {
+        const sphereColor = teleportColorById.get(currentCell.teleportId) ?? new THREE.Color("#db4fff");
+        const sphereMaterial = getTeleportMaterial(`#${sphereColor.getHexString()}`);
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+
+        sphere.position.copy(layout.gridToWorldPosition(x, y, sphereY));
+
+        //sphere.castShadow = true;
+        //sphere.receiveShadow = true;
+        sphere.name = `teleport_${currentCell.teleportId}`;
+
+        // Simple animation (still TODO)
+        sphere.tick = (delta) =>
+        {
+            sphere.rotation.y += delta * 2.5;
+        };
+
+        return sphere;
     }
 
     // Chooses a random color for teleportation points (easily distinguishable from each other)
@@ -229,60 +243,60 @@ function buildMazeWorldFromData(maze, options = {})
         }
     }
 
+    const wallCollisionEntries = [];
+
+    // Creates an axis-aligned collision box for one wall tile so it can be inserted into the octree.
+    function createWallCollisionEntry(x, y)
+    {
+        return {
+            // The wall collision box matches the visible wall cube dimensions so the physics and
+            // visuals describe the same obstacle volume.
+            box: new THREE.Box3().setFromCenterAndSize(
+                layout.gridToWorldPosition(x, y, wallY),
+                new THREE.Vector3(tileSize, wallHeight, tileSize)
+            ),
+            type: "wall",
+            cell: { x, y }
+        };
+    }
+
     for (let y = 0; y < maze.height; y++)
     {
         for (let x = 0; x < maze.width; x++)
         {
             const currentCell = maze.cells[y][x];
 
-            // Creates walls and floors and adds them to the group based on the cell type.
+            // This first pass lays down the static maze geometry and simultaneously gathers the
+            // wall boxes that will later be inserted into the collision octree.
             if (currentCell.type === "wall")
             {
                 group.add(createWallMesh(x, y, currentCell));
+                wallCollisionEntries.push(createWallCollisionEntry(x, y));
             }
             else
             {
                 group.add(createFloorMesh(x, y, currentCell));
+                if (currentCell.teleportId !== null)
+                {
+                    // Teleport markers sit on top of an existing floor tile, so they can be
+                    // created immediately after the floor mesh without a second full maze pass.
+                    group.add(createTeleportMesh(x, y, currentCell));
+                }
             }
         }
     }
 
-    for (let y = 0; y < maze.height; y++)
-    {
-        for (let x = 0; x < maze.width; x++)
-        {
-            const currentCell = maze.cells[y][x];
-
-            if (currentCell.teleportId === null)
-            {
-                continue;
-            }
-
-            const sphereColor = teleportColorById.get(currentCell.teleportId) ?? new THREE.Color("#db4fff");
-            const sphereMaterial = getTeleportMaterial(`#${sphereColor.getHexString()}`);
-
-            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-
-            sphere.position.set(
-                gridToWorldX(x),
-                sphereY,
-                gridToWorldZ(y)
-            );
-
-            //sphere.castShadow = true;
-            //sphere.receiveShadow = true;
-            sphere.name = `teleport_${currentCell.teleportId}`;
-
-            // Simple animation (still TODO)
-            sphere.tick = (delta) =>
-            {
-                sphere.rotation.y += delta * 2.5;
-            };
-
-            group.add(sphere);
-        }
-    }
+    // The octree is built once when the maze is created. After that, player collision queries
+    // can cheaply ask for "nearby walls" instead of testing against every wall in the maze.
+    const collisionOctree = createCollisionOctree(wallCollisionEntries);
+    group.userData.collisionOctree = collisionOctree;
 
     scene.add(group);
-    return group;
+
+    // Returns both the generated mesh group and the shared layout helper used to place it.
+    return {
+        group,
+        layout,
+        collisionOctree
+    };
 }
