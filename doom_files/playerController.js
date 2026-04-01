@@ -1,6 +1,6 @@
 // This file contains the first-person player controller used to move through the maze.
-// It owns pointer-lock look controls, jump/gravity state, and octree-backed collision checks.
-// Conceptually, the camera itself is the player body:
+// It provides look controls, jumping and octree-backed collision checks (still needs some work)
+// The camera itself serves as the player position.
 // - X/Z store horizontal movement inside the maze
 // - Y stores the eye height
 // - a Box3 built around that eye height is used for collision tests
@@ -29,7 +29,7 @@ const MOVEMENT_BINDINGS = [
 
 class FirstPersonPlayerController
 {
-    // Creates the player controller and stores the movement, jumping, and collision settings.
+    // Creates the player controller and stores the movement, jumping and collision settings.
     constructor(camera, domElement, options = {})
     {
         this.camera = camera;
@@ -48,8 +48,7 @@ class FirstPersonPlayerController
         this.jumpSpeed = options.jumpSpeed ?? 10;
         this.gravity = options.gravity ?? 28;
 
-        // `eyeLevel` is the actual camera Y coordinate. `floorHeight` stores where the player's
-        // feet should land. Keeping both makes grounded logic easier to follow.
+        // Eyelevel is the current Y-position of the camera.
         this.eyeLevel = options.eyeLevel ?? (this.floorHeight + this.playerHeight);
         this.verticalVelocity = 0;
         this.isGrounded = true;
@@ -81,12 +80,13 @@ class FirstPersonPlayerController
         this.syncCameraHeight();
     }
 
-    // Hooks keyboard, mouse, and pointer-lock events to the controller.
+    // Hooks keyboard, mouse and pointer-lock events to the controller.
     initEvents()
     {
         document.addEventListener("keydown", (event) => this.onKeyDown(event));
         document.addEventListener("keyup", (event) => this.onKeyUp(event));
         document.addEventListener("mousemove", (event) => this.onMouseMove(event));
+        // This is used to clear movement state when the player is using the minimap or has pressed "escape" to release pointer lock.
         document.addEventListener("pointerlockchange", () => this.onPointerLockChange());
 
         window.addEventListener("blur", () => this.resetMovementState());
@@ -97,8 +97,7 @@ class FirstPersonPlayerController
         });
     }
 
-    // Requests pointer lock for the render canvas. Some browsers require a user gesture, so this
-    // helper quietly fails when the request is rejected.
+    // Requests pointer lock for the render canvas.
     requestPointerLock()
     {
         if (!this.domElement.requestPointerLock)
@@ -341,7 +340,7 @@ class FirstPersonPlayerController
         );
     }
 
-    // Moves the player to the linked teleport destination while preserving facing and velocity.
+    // Moves the player to the linked teleport destination while preserving the direction they are looking and preventing immediate re-teleportation.
     teleportToCell(targetCell)
     {
         if (!targetCell || targetCell.type !== "floor")
@@ -410,7 +409,7 @@ class FirstPersonPlayerController
     // Builds the player's collision box from a candidate eye-level position.
     getPlayerBoundsAt(position, targetBounds = this.playerBounds)
     {
-        // The top of the box matches the eye point; the bottom is one player-height lower.
+        // The top of the box matches the eye point, the bottom is one player-height lower.
         // This makes the controller behave like an upright capsule/box approximation.
         targetBounds.min.set(
             position.x - this.collisionRadius,
@@ -432,8 +431,7 @@ class FirstPersonPlayerController
     {
         if (!this.collisionOctree)
         {
-            // Falling back to "no collisions" keeps the controller usable in test scenes that do
-            // not provide an octree yet.
+            // This is for debugging purposes when the octree is not available. Returning an empty array means no collisions will be detected, so the player can move freely through walls.
             this.collisionCandidates.length = 0;
             return this.collisionCandidates;
         }
@@ -444,8 +442,8 @@ class FirstPersonPlayerController
     // Returns true when the provided bounds overlap any wall box returned by the octree query.
     intersectsWall(bounds)
     {
-        // The octree narrows the search to nearby wall boxes. We still do exact Box3 overlap
-        // checks here because the octree is only a broad-phase acceleration structure.
+        // The octree narrows the search to nearby wall boxes. This is a much cheaper operation than checking every wall in the maze, especially as the maze size grows. 
+        // TODO: Will also include objects
         const candidates = this.queryCollisionCandidates(bounds);
 
         for (const entry of candidates)
@@ -467,9 +465,7 @@ class FirstPersonPlayerController
             return false;
         }
 
-        // Instead of moving first and "pushing out" afterward, we predict the next position,
-        // build the player's collision box there, and only accept that axis movement if the box
-        // would remain collision-free.
+        // This is a speculative move to test for collisions. The actual camera position is only updated after we know the move is valid, so the player can slide along walls instead of getting stuck on them.
         this.candidatePosition.copy(this.camera.position);
         this.candidatePosition[axis] += amount;
 
@@ -505,7 +501,7 @@ class FirstPersonPlayerController
     // Applies horizontal and vertical movement for the current frame.
     move(frameMovement, delta)
     {
-        // Horizontal axes are resolved separately so the player can slide along walls naturally.
+        // Horizontal axes are resolved separately so the player can slide along walls normally.
         this.resolveAxisMovement("x", frameMovement.x);
         this.resolveAxisMovement("z", frameMovement.z);
 
@@ -516,8 +512,7 @@ class FirstPersonPlayerController
 
         if (this.eyeLevel <= groundedEyeLevel)
         {
-            // Clamp to the floor so tiny accumulated floating-point errors do not let the player
-            // slowly sink or hover.
+            // Stuck to the ground: snap to the grounded eye level and reset vertical velocity so the player does not keep trying to fall through the floor. (in case of floating errors)
             this.eyeLevel = groundedEyeLevel;
             this.verticalVelocity = 0;
             this.isGrounded = true;
@@ -526,6 +521,7 @@ class FirstPersonPlayerController
         {
             // Hitting something above stops upward movement; hitting something below means the
             // player landed and is grounded again.
+            // TODO: ceiling still needs to be implemented
             this.verticalVelocity = 0;
             this.isGrounded = verticalMovement < 0;
         }
@@ -537,7 +533,7 @@ class FirstPersonPlayerController
         this.syncCameraHeight();
     }
 
-    // Converts input state into first-person movement, gravity, and jumping for the current frame.
+    // Converts input state into first-person movement, gravity and jumping for the current frame.
     update(delta)
     {
         this.moveInput.set(
@@ -556,11 +552,11 @@ class FirstPersonPlayerController
 
         if (!this.isGrounded)
         {
-            // Gravity is integrated explicitly each frame using the clamped loop delta.
+            // Gravity is just a constant downward acceleration, applied every frame when the player is not grounded. This makes jumping feel more natural and prevents the player from floating up indefinitely if they keep jumping while going up.
             this.verticalVelocity -= this.gravity * delta;
         }
 
-        // Input is defined in local player space, then rotated by yaw into world-space movement.
+        // Input is defined in local player space, then rotated by the camera yaw to convert it into world space movement.
         this.frameMovement.copy(this.moveInput);
         this.frameMovement.applyAxisAngle(this.worldUp, this.yaw);
 

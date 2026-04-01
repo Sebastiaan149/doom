@@ -1,8 +1,6 @@
 // This file converts the generated 2D maze data into meshes placed in the 3D world.
-// It is the bridge between the abstract maze data (`cells`, `start`, `goal`, teleports) and
-// the concrete Three.js scene graph used for rendering and collision.
 
-// Builds the visible floors, walls, and teleport markers for a generated maze.
+// Builds the visible floors, walls and teleport markers for a generated maze.
 // TODO: change this with textures
 function buildMazeWorldFromData(maze, options = {})
 {
@@ -21,17 +19,15 @@ function buildMazeWorldFromData(maze, options = {})
     const floorY = layout.floorY;
     const wallY = layout.wallY;
 
-    // Teleport spheres float slightly above the floor so they read as interactable markers
-    // instead of being visually merged into the ground plane.
-    const sphereRadius = options.teleportSphereRadius ?? tileSize * 0.28;  // sphere is temporarily used to visualize the transportation points.
+    // Teleport spheres float slightly above the floor
+    const sphereRadius = options.teleportSphereRadius ?? tileSize * 0.28;  // Sphere is temporarily used to visualize the transportation points.
     const sphereY = floorY + floorThickness / 2 + sphereRadius + 0.08;
 
-    // This group will hold all the maze-related meshes, making it easier to manage them as a single unit in the scene.
+    // This group holds the maze meshes (still temporary)
     const group = new THREE.Group();  // Likely to change when handling collisions
     group.name = "mazeWorld";
     group.userData.mazeLayout = layout;
 
-    //const floorGeometry = new THREE.BoxGeometry(tileSize, floorThickness, tileSize);
     const floorGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
     floorGeometry.rotateX(-Math.PI / 2);
     const wallGeometry = new THREE.BoxGeometry(tileSize, wallHeight, tileSize);
@@ -129,7 +125,7 @@ function buildMazeWorldFromData(maze, options = {})
                 colorKey,
                 new THREE.MeshStandardMaterial({
                     color: color,
-                    emissive: color.clone().multiplyScalar(0.88),  // Make material emit light for glowing effect
+                    emissive: color.clone().multiplyScalar(0.88),
                     metalness: 0.35,
                     roughness: 0.35
                 })
@@ -287,7 +283,7 @@ function buildMazeWorldFromData(maze, options = {})
     }
 
     // The octree is built once when the maze is created. After that, player collision queries
-    // can cheaply ask for "nearby walls" instead of testing against every wall in the maze.
+    // can ask for "nearby walls" instead of testing against every wall in the maze.
     const collisionOctree = createCollisionOctree(wallCollisionEntries);
     group.userData.collisionOctree = collisionOctree;
 

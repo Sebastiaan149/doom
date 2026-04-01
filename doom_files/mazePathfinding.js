@@ -1,6 +1,6 @@
-// This file contains shortest-path helpers for navigating the generated maze.
-// The maze graph can include both normal floor adjacency and optional teleport links, so callers
-// can choose whether they want pure walking routes or the true shortest traversable route.
+// This file contains shortest-path helper functions for navigating the generated maze.
+// The maze graph can include both normal adjacent floors and optional teleport links. This
+// can be usefull when choosing for the pure walkable path or the fastest path that may include teleports. The pathfinding algorithm is a standard breadth-first search. As our maze includes more open-ended areas as well (for simplicity reasons), this seems like a good fit.
 
 // Creates a stable string key for one maze cell coordinate.
 function createMazeCellKey(x, y)

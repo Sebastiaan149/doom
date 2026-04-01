@@ -1,6 +1,5 @@
-// This file centralizes conversions between maze-grid coordinates and world-space positions.
-// Any system that needs to translate between "maze cell space" and "Three.js world space"
-// should go through this helper so that the minimap, player, and mesh builder all agree.
+// This file contains the conversions between maze-grid coordinates and world-space positions.
+// Helps the minimap and the 3D world stay in sync
 
 // Creates a reusable layout helper around a generated maze and its render settings.
 function createMazeLayout(maze, options = {})
@@ -11,18 +10,17 @@ function createMazeLayout(maze, options = {})
     const floorY = options.floorY ?? -3;
     const wallY = floorY + wallHeight / 2;
 
-    // The maze is rendered around the world origin, so these center values shift the grid from
-    // top-left-based indices into a centered world-space coordinate system.
+    // The maze is rendered around the world origin, so the center of the maze in world space is a function of the maze dimensions and tile size.
     const centerX = (maze.width * tileSize) / 2 - tileSize / 2;
     const centerZ = (maze.height * tileSize) / 2 - tileSize / 2;
 
-    // Converts a maze column index into a world-space X coordinate.
+    // Converts a maze column index into a world-space X-coordinate.
     function gridToWorldX(x)
     {
         return x * tileSize - centerX;
     }
 
-    // Converts a maze row index into a world-space Z coordinate.
+    // Converts a maze row index into a world-space Z-coordinate.
     function gridToWorldZ(y)
     {
         return y * tileSize - centerZ;
@@ -38,11 +36,9 @@ function createMazeLayout(maze, options = {})
         );
     }
 
-    // Converts a world-space point into fractional maze coordinates for smooth tracking.
+    // Converts a world-space point into fractional maze coordinates, where the integer part is the cell index and the decimal part is the position inside that cell. Is easier to work with than raw world coordinates.
     function worldToGridFractionalCoordinates(worldX, worldZ)
     {
-        // Fractional coordinates are useful for UI like the minimap because they preserve smooth
-        // movement inside a tile instead of snapping the player marker from cell center to center.
         return {
             x: (worldX + centerX) / tileSize,
             y: (worldZ + centerZ) / tileSize
@@ -55,7 +51,7 @@ function createMazeLayout(maze, options = {})
         const fractionalCoordinates = worldToGridFractionalCoordinates(worldX, worldZ);
 
         return {
-            // Adding 0.5 effectively rounds to the nearest tile center.
+            // Adding 0.5 rounds to the nearest tile center.
             x: Math.floor(fractionalCoordinates.x + 0.5),
             y: Math.floor(fractionalCoordinates.y + 0.5)
         };
@@ -93,8 +89,7 @@ function createMazeLayout(maze, options = {})
     // Returns true when the cell can be occupied by the player.
     function isWalkable(x, y)
     {
-        // This is still useful for reasoning about the maze semantically, even though the player
-        // now uses the octree for physical wall collisions.
+        // The player can only walk on floor cells, so we check the cell type here.
         const currentCell = getCell(x, y);
         return currentCell?.type === "floor";
     }
@@ -108,8 +103,7 @@ function createMazeLayout(maze, options = {})
         let bestCell = null;
         let bestDistance = Infinity;
 
-        // Sampling a small neighborhood keeps cell lookup stable near tile boundaries without
-        // forcing callers to duplicate the same "nearest floor cell" logic.
+        // Sample cells in an area around the provided world position and return the walkable cell closest to that position.
         for (let offsetY = -searchRadius; offsetY <= searchRadius; offsetY++)
         {
             for (let offsetX = -searchRadius; offsetX <= searchRadius; offsetX++)

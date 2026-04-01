@@ -1,31 +1,31 @@
-// This file assembles the scene, maze, controls, minimap, and render loop into the running game.
-// The constructor below is effectively the bootstrap pipeline for the entire project:
-// 1. create the rendering objects
-// 2. generate the maze + minimap overlay
-// 3. convert the maze into 3D meshes
-// 4. build collision data from the same maze
-// 5. create the player controller
-// 6. register everything with the shared game loop
+// This file sets up the scene, maze, controls, minimap,and render loop into the running game.
+// The constructor below is the pipeline for the entire project:
+// 1. Create the rendering objects
+// 2. Generate the maze + minimap overlay
+// 3. Convert the maze into 3D meshes
+// 4. Build collision data from the same maze
+// 5. Create the player controller
+// 6. Register everything within the shared game loop
 
-// These settings control the maze generation and the static minimap resolution.
+// These basic settings control the maze generation and the static minimap resolution.
 const MAZE_SETTINGS = {
     mazeWidth: 25,
     mazeHeight: 15,
     tileSize: 8,
-    mainTheme: "oldForestTemple"
+    mainTheme: "oldForestTemple"   // Additional themes are available in the MazeGenerator class, but will be clickable in the UI at a later stage.
 };
 
 // These settings control how the generated maze is converted into 3D world geometry.
 const MAZE_WORLD_SETTINGS = {
     tileSize: 8,
-    wallHeight: 5,
+    wallHeight: 6,
     floorY: -3
 };
 
-// Owns the high-level game lifecycle and the connections between all subsystems.
+// Owns the game lifecycle and the connections between all the different components.
 class World
 {
-    // Creates the full game world and wires every subsystem together.
+    // Creates the full game world and connects every component together.
     constructor(container)
     {
         this.container = container;

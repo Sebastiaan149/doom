@@ -1,6 +1,4 @@
-// This file contains the shared scene, camera, renderer, lighting, and resize helpers.
-// It intentionally stays small and generic so the rest of the game can depend on a stable
-// rendering foundation without mixing rendering setup into gameplay code.
+// This file contains the shared scene, camera, renderer, lighting and resize helpers.
 
 // Creates the perspective camera used by the first-person controller.
 function createCamera(options = {})
@@ -13,9 +11,8 @@ function createCamera(options = {})
     );
 
     // `YXZ` is important for first-person controls:
-    // - yaw is applied around Y first
-    // - pitch is applied around X second
-    // This avoids the unintuitive feel you get when Euler rotations use the default order.
+    // yaw is applied around Y first
+    // pitch is applied around X second
     camera.rotation.order = "YXZ";
     camera.position.set(0, 0, 0);
 
@@ -23,6 +20,7 @@ function createCamera(options = {})
 }
 
 // Builds the light rig that illuminates the maze.
+// TODO: still needs to be fixed with shadows and such
 function createLights()
 {
     const group = new THREE.Group();
@@ -36,10 +34,12 @@ function createLights()
 
     // The hemisphere and ambient lights fill in the dark areas so the maze remains readable
     // even without detailed local light sources.
+    // These will still be changed in a later stage
     const hemi = new THREE.HemisphereLight(0xddeeff, 0x444444, 1.3);
     const ambient = new THREE.AmbientLight(0xffffff, 0.45);
 
     group.add(sun, hemi, ambient);
+    //group.add(sun, ambient);
     return group;
 }
 

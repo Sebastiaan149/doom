@@ -1,16 +1,16 @@
-// This file builds the HTML minimap overlay and keeps both the player marker and route display
+// This file builds the minimap overlay and keeps both the player marker and route display
 // in sync with the live game state.
 // The minimap is composed from three layers:
-// 1. a static canvas generated from the maze ASCII preview
-// 2. an SVG route layer for the current destination/path
-// 3. an SVG player arrow image that tracks the camera position and facing direction
+// 1. A static canvas generated from the maze ASCII
+// 2. An SVG route layer for the current destination/path
+// 3. An SVG player arrow image that tracks the camera position and facing direction
 
 const MINIMAP_SVG_NS = "http://www.w3.org/2000/svg";
 
-// Converts the ASCII maze preview into a canvas texture that can be reused for the minimap.
+// Converts the ASCII maze into a canvas texture that can be reused for the minimap.
 function createMazeTextureFromAscii(ascii, tileSize = 8)
 {
-    // The same ASCII preview is used both for human-readable debugging and for drawing the map.
+    // Gets the canvas and texture for the maze base layer, which is a simple colored grid based on the ASCII layout.
     const canvas = asciiToTileMapCanvas(ascii, tileSize);
 
     const texture = new THREE.CanvasTexture(canvas);
@@ -58,7 +58,7 @@ function createMinimapPathLayer(baseCanvas, tileSize)
     };
 }
 
-// Groups the static map, the route overlay, and the player marker so they stay perfectly aligned.
+// Groups the static map, the route overlay and the player marker so they stay perfectly aligned.
 function createMinimapCanvasStack(baseCanvas, pathLayer, playerMarker)
 {
     const canvasStack = document.createElement("div");
@@ -82,8 +82,7 @@ function createMinimapCanvasStack(baseCanvas, pathLayer, playerMarker)
 // Stores useful debug references on the window for manual inspection in the browser console.
 function exposeGeneratedMazeDebugData(maze, minimap)
 {
-    // These globals are strictly debugging aids so the generated state can be inspected in the
-    // browser console while tuning maze generation, routing, or overlay logic.
+    // These are just for debugging purposes
     window.generatedMaze = maze;
     window.generatedMazeAscii = maze.ascii;
     window.generatedMazeCanvas = minimap.baseCanvas;
@@ -92,7 +91,7 @@ function exposeGeneratedMazeDebugData(maze, minimap)
     window.generatedMazeRouteLayer = minimap.pathLayer.svg;
 }
 
-// Creates a controller that manages marker placement, destination selection, and route drawing.
+// Creates a controller that manages marker placement, destination selection and route drawing.
 function createMinimapController(maze, result, tileSize)
 {
     const baseCanvas = result.canvas;
@@ -337,7 +336,7 @@ function createMinimapController(maze, result, tileSize)
         };
     }
 
-    // Shows or hides the selected destination marker, walk path, and subtle teleport connectors.
+    // Shows or hides the selected destination marker, walk path and subtle teleport connectors.
     function drawCurrentRoute()
     {
         if (destinationCell)
@@ -502,8 +501,7 @@ function createMinimapController(maze, result, tileSize)
         const displayTileSize = metrics.displayWidth / maze.width;
         const markerSize = Math.max(displayTileSize * 1.4, 16);
 
-        // The SVG asset points "up" by default, while atan2 here gives the direction relative to
-        // the positive X axis. The extra PI / 2 rotates between those conventions.
+        // The SVG asset points "up" by default. atan2 returns the angle relative to the positive X axis, so we add 90 degrees to align it with the positive Y axis.
         const angleInRadians = Math.atan2(lookDirection.z, lookDirection.x) + Math.PI / 2;
         const angleInDegrees = THREE.MathUtils.radToDeg(angleInRadians);
 
@@ -535,8 +533,7 @@ function createMinimapController(maze, result, tileSize)
             || pixelPosition.y > metrics.displayHeight
         )
         {
-            // Hiding the marker rather than clamping it avoids misleading "stuck on the edge"
-            // visuals if the player ever ends up outside the intended map region.
+            // If the player is outside the bounds of the minimap (by falling into the void should this bug happen), we hide the marker to avoid confusion from it being stuck at the edge of the map.
             playerMarker.style.display = "none";
             return;
         }
@@ -676,7 +673,7 @@ function addMazeMapOverlay(container, options = {})
         mainTheme: mainTheme
     });
 
-    // The maze generator already returns an ASCII preview, so the minimap can be built without
+    // The maze generator already returns an ASCII field, so the minimap can be built without
     // re-walking the maze cells in a second custom rendering path.
     const result = createMazeTextureFromAscii(maze.ascii, tileSize);
     result.canvas.style.width = `${maze.width * tileSize * 2}px`;
@@ -730,7 +727,7 @@ function addControlsHint(container)
 {
     const hint = document.createElement("div");
     hint.className = "controls-overlay";
-    hint.textContent = "Click to capture mouse | WASD / ZQSD move | Space jump | Shift sprint | M toggle map";
+    hint.textContent = "Click to capture mouse | WASD / ZQSD move | Space jump | Shift sprint | M toggle map | Select destination on map";
 
     container.appendChild(hint);
     return hint;
