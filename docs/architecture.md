@@ -60,10 +60,19 @@ Owned by: `doom_files/maze3dWorld.js`
 This file translates the maze data into visible Three.js objects:
 
 - floor planes
+- ceiling planes
 - wall cubes
 - teleport marker spheres
+- theme-specific decoration props
+- local section lights
 
 It also creates one collision box per wall tile. Those boxes are inserted into the octree so the player can ask "what walls are near me?" without scanning the whole maze.
+
+The world builder now relies on `doom_files/worldMaterials.js` for textured materials. That helper generates procedural albedo and bump textures in code, keeps a shared material cache for rebuild stability, and writes world-aligned UVs onto each floor, ceiling, and wall mesh so adjacent surfaces line up instead of restarting their texture phase tile-by-tile.
+
+The surface "recipes" that describe how each family of walls/floors should look are now split into `doom_files/worldMaterialDescriptors.js`. This keeps theme/style configuration separate from texture generation and material instancing.
+
+Decorative props and section lights are now split into `doom_files/worldDecor.js`. That file groups maze cells by region, chooses anchor cells for rooms/corridors, and places a small non-colliding landmark cluster that matches the region theme.
 
 ### 4. Collision Octree
 
@@ -114,6 +123,8 @@ The overlay does not inspect the 3D scene to know where walls are. It uses the s
 
 The minimap can be opened either with its UI button or with `M`. Opening it releases pointer lock so the cursor can click a destination. Closing it requests pointer lock again so control returns to first-person movement.
 
+The minimap header also contains a theme selector. Choosing a different theme asks `doom_files/doom.js` to tear down the current maze instance and rebuild the minimap, 3D world, collision octree, and player spawn state around the newly generated maze.
+
 ### 7. Pathfinding
 
 Owned by: `doom_files/mazePathfinding.js`
@@ -142,6 +153,14 @@ Owned by:
 - lights
 - renderer
 - resize handling
+
+It also now owns the global renderer polish that makes the textured maze read better:
+
+- soft shadow mapping
+- sRGB output
+- ACES tone mapping
+- broader directional-light shadow coverage for the maze
+- a visible sky marker placed at the same position as the main shadow-casting directional light
 
 `gameLoop.js` owns the shared `tick(delta)` loop. Anything animated or updated each frame gets added to `loop.updatables`.
 

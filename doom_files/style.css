@@ -47,10 +47,47 @@ body {
   margin-bottom: 6px;
 }
 
+.maze-map-title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 /* The minimap title labels the active maze theme. */
 .maze-map-title {
   color: white;
   font-size: 14px;
+}
+
+.maze-map-theme-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.maze-map-theme-label {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+}
+
+.maze-map-theme-select {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+.maze-map-theme-select:focus-visible {
+  outline: 2px solid #ffe45c;
+  outline-offset: 2px;
+}
+
+.maze-map-theme-select option {
+  color: black;
 }
 
 /* The toggle button expands the minimap so the user can click a destination. */
@@ -95,6 +132,10 @@ body {
   width: min(80vw, 960px);
   height: auto;
   cursor: crosshair;
+}
+
+.maze-map-overlay.is-expanded .maze-map-header {
+  margin-bottom: 10px;
 }
 
 /* The base minimap uses nearest-neighbor scaling for crisp tile edges. */

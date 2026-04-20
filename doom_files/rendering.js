@@ -19,35 +19,30 @@ function createCamera(options = {})
     return camera;
 }
 
-// Builds the light rig that illuminates the maze.
-// TODO: still needs to be fixed with shadows and such
+// Builds the shared base light rig that supports the local in-maze light sources.
+// The maze should feel like an enclosed space, so this rig stays intentionally subtle.
 function createLights()
 {
     const group = new THREE.Group();
+    group.name = "mazeBaseLights";
 
-    // A directional light acts like the "sun" and gives strong readable shadows.
-    const sun = new THREE.DirectionalLight("white", 3.5);
-    sun.position.set(20, 30, 10);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    // A low hemisphere light prevents the unlit side of the maze from going fully black,
+    // while still leaving enough contrast for the decorative point lights to shape the space.
+    const hemi = new THREE.HemisphereLight(0x4d739c, 0x17120f, 0.62);
 
-    // The hemisphere and ambient lights fill in the dark areas so the maze remains readable
-    // even without detailed local light sources.
-    // These will still be changed in a later stage
-    const hemi = new THREE.HemisphereLight(0xddeeff, 0x444444, 1.3);
-    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+    // A faint ambient lift keeps surfaces readable between local light pools.
+    const ambient = new THREE.AmbientLight(0xdce7f7, 0.34);
 
-    group.add(sun, hemi, ambient);
-    //group.add(sun, ambient);
+    group.add(hemi, ambient);
     return group;
 }
 
-// Creates the base Three.js scene and its background color.
+// Creates the base Three.js scene and its enclosed-atmosphere background.
 function createScene()
 {
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#6fb5e9");
+    scene.background = new THREE.Color("#101923");
+    scene.fog = new THREE.Fog("#101923", 120, 320);
     return scene;
 }
 
@@ -60,6 +55,10 @@ function createRenderer()
 
     renderer.physicallyCorrectLights = true;
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.02;
     renderer.domElement.className = "scene-canvas";
 
     return renderer;

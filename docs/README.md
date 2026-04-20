@@ -36,6 +36,15 @@ This folder explains the project at two levels:
 - `doom_files/maze3dWorld.js`
   Converts maze data into Three.js meshes and collision entries.
 
+- `doom_files/worldMaterials.js`
+  Procedural textured material library for floors, walls, ceilings, and special pads, including shared material caching plus world-aligned UV mapping so adjacent surfaces line up cleanly.
+
+- `doom_files/worldMaterialDescriptors.js`
+
+
+- `doom_files/worldDecor.js`
+  Theme-specific prop placement and local section-light generation.
+
 - `doom_files/collisionOctree.js`
   Broad-phase spatial index used for wall collision queries.
 

@@ -263,6 +263,29 @@ class FirstPersonPlayerController
         this.camera.position.y = this.eyeLevel;
     }
 
+    // Replaces the maze-specific runtime dependencies when the world is rebuilt with a new theme.
+    updateMazeContext(options = {})
+    {
+        this.mazeLayout = options.mazeLayout ?? this.mazeLayout;
+        this.collisionOctree = options.collisionOctree ?? this.collisionOctree;
+        this.moveSpeed = options.moveSpeed ?? this.moveSpeed;
+        this.collisionRadius = options.collisionRadius ?? this.collisionRadius;
+        this.jumpSpeed = options.jumpSpeed ?? this.jumpSpeed;
+        this.gravity = options.gravity ?? this.gravity;
+
+        if (options.floorHeight !== undefined)
+        {
+            this.floorHeight = options.floorHeight;
+        }
+        else if (this.mazeLayout)
+        {
+            this.floorHeight = this.mazeLayout.floorY;
+        }
+
+        this.teleportCooldown = 0;
+        this.teleportIgnoredCellKey = null;
+    }
+
     // Returns the camera height that corresponds to standing on the floor.
     getGroundedEyeLevel()
     {

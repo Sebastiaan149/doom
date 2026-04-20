@@ -6,6 +6,14 @@
 // 3. An SVG player arrow image that tracks the camera position and facing direction
 
 const MINIMAP_SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULT_MAZE_THEME_OPTIONS = [
+    { value: "castle", label: "Castle" },
+    { value: "industrial", label: "Industrial" },
+    { value: "oldForestTemple", label: "Old Forest Temple" },
+    { value: "fireCave", label: "Fire Cave" },
+    { value: "iceCave", label: "Ice Cave" },
+    { value: "random", label: "Random Mix" }
+];
 
 // Converts the ASCII maze into a canvas texture that can be reused for the minimap.
 function createMazeTextureFromAscii(ascii, tileSize = 8)
@@ -620,6 +628,17 @@ function createMinimapController(maze, result, tileSize)
     // Allows the minimap to be opened and closed from the keyboard.
     function handleGlobalKeyDown(event)
     {
+        const activeTagName = event.target?.tagName;
+
+        if (
+            activeTagName === "INPUT"
+            || activeTagName === "SELECT"
+            || event.target?.isContentEditable
+        )
+        {
+            return;
+        }
+
         const pressedMinimapKey = event.code === "KeyM" || event.key?.toLowerCase() === "m";
 
         if (!pressedMinimapKey || event.repeat || event.altKey || event.ctrlKey || event.metaKey)
@@ -651,6 +670,15 @@ function createMinimapController(maze, result, tileSize)
         },
         toggleExpanded,
         setExpanded,
+        getIsExpanded()
+        {
+            return isExpanded;
+        },
+        destroy()
+        {
+            document.removeEventListener("keydown", handleGlobalKeyDown);
+            mapWrapper?.remove();
+        },
 
         // Updates the route state and the live player arrow each frame after the player moves.
         tick()
@@ -664,10 +692,14 @@ function createMinimapController(maze, result, tileSize)
 // Creates the DOM overlay for the minimap and returns both the maze and its live UI controller.
 function addMazeMapOverlay(container, options = {})
 {
+    const attachToContainer = options.attachToContainer ?? true;
     const mazeWidth = options.mazeWidth ?? 25;
     const mazeHeight = options.mazeHeight ?? 15;
     const tileSize = options.tileSize ?? 8;
     const mainTheme = options.mainTheme ?? "random";
+    const themeOptions = Array.isArray(options.availableThemes) && options.availableThemes.length > 0
+        ? options.availableThemes
+        : DEFAULT_MAZE_THEME_OPTIONS;
 
     const maze = generateMazeMap(mazeWidth, mazeHeight, {
         mainTheme: mainTheme
@@ -688,19 +720,52 @@ function addMazeMapOverlay(container, options = {})
     const header = document.createElement("div");
     header.className = "maze-map-header";
 
+    const titleGroup = document.createElement("div");
+    titleGroup.className = "maze-map-title-group";
+
     const title = document.createElement("div");
     title.className = "maze-map-title";
-    title.textContent = `Maze Map (${mainTheme})`;
+    title.textContent = "Maze Map";
+
+    const themeControl = document.createElement("label");
+    themeControl.className = "maze-map-theme-control";
+
+    const themeLabel = document.createElement("span");
+    themeLabel.className = "maze-map-theme-label";
+    themeLabel.textContent = "Theme";
+
+    const themeSelect = document.createElement("select");
+    themeSelect.className = "maze-map-theme-select";
+    themeSelect.setAttribute("aria-label", "Maze theme");
+
+    for (const option of themeOptions)
+    {
+        const optionElement = document.createElement("option");
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        optionElement.selected = option.value === mainTheme;
+        themeSelect.appendChild(optionElement);
+    }
+
+    themeControl.append(themeLabel, themeSelect);
+    titleGroup.append(title, themeControl);
 
     const toggleButton = document.createElement("button");
     toggleButton.type = "button";
     toggleButton.className = "maze-map-toggle";
 
-    header.append(title, toggleButton);
+    header.append(titleGroup, toggleButton);
     mapWrapper.append(header, minimap.canvasStack);
-    container.appendChild(mapWrapper);
 
     minimap.attachUi(mapWrapper, toggleButton);
+
+    function mount()
+    {
+        if (mapWrapper.parentElement !== container)
+        {
+            container.appendChild(mapWrapper);
+        }
+    }
 
     toggleButton.addEventListener("click", (event) =>
     {
@@ -714,12 +779,36 @@ function addMazeMapOverlay(container, options = {})
         minimap.handleMapClick(event);
     });
 
+    themeSelect.addEventListener("change", (event) =>
+    {
+        event.stopPropagation();
+        const nextTheme = event.currentTarget.value;
+
+        window.setTimeout(() =>
+        {
+            options.onThemeChange?.(nextTheme);
+        }, 0);
+    });
+
+    if (options.initialExpanded)
+    {
+        minimap.setExpanded(true);
+    }
+
+    if (attachToContainer)
+    {
+        mount();
+    }
+
     console.log("Generated maze ascii:");
     console.log(maze.ascii);
     console.log("Teleport pairs:");
     console.log(maze.teleportPairs);
 
-    return minimap;
+    return {
+        ...minimap,
+        mount
+    };
 }
 
 // Adds a lightweight control legend so the first-person interaction is discoverable.

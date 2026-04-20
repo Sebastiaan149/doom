@@ -12,7 +12,7 @@ const MAZE_SETTINGS = {
     mazeWidth: 25,
     mazeHeight: 15,
     tileSize: 8,
-    mainTheme: "oldForestTemple"   // Additional themes are available in the MazeGenerator class, but will be clickable in the UI at a later stage.
+    mainTheme: "fireCave"
 };
 
 // These settings control how the generated maze is converted into 3D world geometry.
@@ -21,6 +21,16 @@ const MAZE_WORLD_SETTINGS = {
     wallHeight: 6,
     floorY: -3
 };
+
+// The available maze themes are exposed in the UI so the world can be regenerated on demand.
+const MAZE_THEME_OPTIONS = [
+    { value: "castle", label: "Castle" },
+    { value: "industrial", label: "Industrial" },
+    { value: "oldForestTemple", label: "Old Forest Temple" },
+    { value: "fireCave", label: "Fire Cave" },
+    { value: "iceCave", label: "Ice Cave" },
+    { value: "random", label: "Random Mix" }
+];
 
 // Owns the game lifecycle and the connections between all the different components.
 class World
@@ -41,53 +51,16 @@ class World
         this.scene.add(createLights());
         addControlsHint(this.container);
 
-        // The minimap creation step also generates the maze data structure. That maze object is
-        // reused by the 3D builder so the 2D and 3D views always describe the same layout.
-        this.minimap = addMazeMapOverlay(this.container, MAZE_SETTINGS);
-        this.maze = this.minimap.maze;
+        this.currentTheme = MAZE_SETTINGS.mainTheme;
+        this.controls = null;
+        this.minimap = null;
+        this.mazeWorld = null;
+        this.mazeGroup = null;
+        this.mazeLayout = null;
+        this.collisionOctree = null;
+        this.maze = null;
 
-        // The 3D builder returns both the visible meshes and the shared helper objects used to
-        // navigate the maze in world space.
-        const mazeWorld = buildMazeWorldFromData(this.maze, {
-            scene: this.scene,
-            ...MAZE_WORLD_SETTINGS
-        });
-
-        this.mazeGroup = mazeWorld.group;
-        this.mazeLayout = mazeWorld.layout;
-        this.collisionOctree = mazeWorld.collisionOctree;
-
-        window.generatedMazeLayout = this.mazeLayout;
-        window.generatedCollisionOctree = this.collisionOctree;
-
-        // The player controller receives the camera plus the collision data generated from the
-        // maze walls. This keeps movement logic completely separate from world-building logic.
-        this.controls = new FirstPersonPlayerController(this.camera, this.renderer.domElement, {
-            mazeLayout: this.mazeLayout,
-            collisionOctree: this.collisionOctree,
-            moveSpeed: this.mazeLayout.tileSize * 1.25,
-            eyeHeight: 2.1,
-            playerHeight: 2.1,
-            floorHeight: this.mazeLayout.floorY,
-            collisionRadius: this.mazeLayout.tileSize * 0.2,
-            jumpSpeed: this.mazeLayout.tileSize * 1.35,
-            gravity: this.mazeLayout.tileSize * 4
-        });
-
-        // Spawn first, then attach the minimap to the live player state so the arrow starts at
-        // the correct location and orientation immediately.
-        this.spawnPlayerAtMazeStart();
-        this.minimap.trackPlayer(this.controls, this.mazeLayout);
-
-        // The loop only knows how to call `tick(delta)`, so every animated system is registered
-        // through this shared `updatables` array.
-        this.registerUpdatable(this.controls);
-        this.registerUpdatable(this.minimap);
-
-        for (const child of this.mazeGroup.children)
-        {
-            this.registerUpdatable(child);
-        }
+        this.buildMazeForTheme(this.currentTheme);
 
         this.resizer = new Resizer(this.container, this.camera, this.renderer);
     }
@@ -95,9 +68,246 @@ class World
     // Registers one tickable object with the shared loop.
     registerUpdatable(object)
     {
-        if (object?.tick)
+        if (object?.tick && !this.loop.updatables.includes(object))
         {
             this.loop.updatables.push(object);
+        }
+    }
+
+    // Removes one tickable object from the shared loop.
+    unregisterUpdatable(object)
+    {
+        this.loop.updatables = this.loop.updatables.filter((candidate) => candidate !== object);
+    }
+
+    // Registers every tickable object inside a group hierarchy.
+    registerUpdatableTree(root)
+    {
+        root?.traverse((object) =>
+        {
+            this.registerUpdatable(object);
+        });
+    }
+
+    // Removes every tickable object inside a group hierarchy.
+    unregisterUpdatableTree(root)
+    {
+        if (!root)
+        {
+            return;
+        }
+
+        const objectsToRemove = new Set();
+        root.traverse((object) => objectsToRemove.add(object));
+
+        this.loop.updatables = this.loop.updatables.filter((object) => !objectsToRemove.has(object));
+    }
+
+    // Derives the player-controller settings from the current maze layout.
+    createPlayerSettings(layout)
+    {
+        return {
+            mazeLayout: layout,
+            collisionOctree: this.collisionOctree,
+            moveSpeed: layout.tileSize * 1.25,
+            eyeHeight: 2.1,
+            playerHeight: 2.1,
+            floorHeight: layout.floorY,
+            collisionRadius: layout.tileSize * 0.2,
+            jumpSpeed: layout.tileSize * 1.35,
+            gravity: layout.tileSize * 4
+        };
+    }
+
+    // Removes the old maze/minimap instance so a new theme can be generated cleanly.
+    teardownMazeSystems()
+    {
+        if (this.minimap)
+        {
+            this.unregisterUpdatable(this.minimap);
+            this.minimap.destroy();
+            this.minimap = null;
+        }
+
+        if (this.mazeGroup)
+        {
+            this.unregisterUpdatableTree(this.mazeGroup);
+        }
+
+        if (this.mazeWorld?.dispose)
+        {
+            this.mazeWorld.dispose();
+        }
+        else if (this.mazeGroup)
+        {
+            this.scene.remove(this.mazeGroup);
+        }
+
+        this.mazeWorld = null;
+        this.mazeGroup = null;
+        this.mazeLayout = null;
+        this.collisionOctree = null;
+        this.maze = null;
+    }
+
+    // Creates a full maze/minimap/world bundle without replacing the live one yet.
+    createThemeSystems(theme, options = {})
+    {
+        const shouldKeepExpanded = options.keepMapExpanded ?? false;
+        let minimap = null;
+        let mazeWorld = null;
+
+        try
+        {
+            minimap = addMazeMapOverlay(this.container, {
+                ...MAZE_SETTINGS,
+                mainTheme: theme,
+                availableThemes: MAZE_THEME_OPTIONS,
+                initialExpanded: shouldKeepExpanded,
+                attachToContainer: false,
+                onThemeChange: (nextTheme) => this.rebuildMaze(nextTheme)
+            });
+
+            const maze = minimap.maze;
+            mazeWorld = buildMazeWorldFromData(maze, {
+                scene: this.scene,
+                renderer: this.renderer,
+                attachToScene: false,
+                ...MAZE_WORLD_SETTINGS
+            });
+
+            return {
+                minimap,
+                maze,
+                mazeWorld,
+                mazeGroup: mazeWorld.group,
+                mazeLayout: mazeWorld.layout,
+                collisionOctree: mazeWorld.collisionOctree
+            };
+        }
+        catch (error)
+        {
+            minimap?.destroy?.();
+            mazeWorld?.dispose?.();
+            throw error;
+        }
+    }
+
+    // Releases a not-yet-committed theme bundle when a rebuild fails mid-flight.
+    disposeThemeSystems(themeSystems)
+    {
+        if (!themeSystems)
+        {
+            return;
+        }
+
+        themeSystems.minimap?.destroy?.();
+        themeSystems.mazeWorld?.dispose?.();
+    }
+
+    // Replaces the live maze with a fully built theme bundle.
+    applyThemeSystems(theme, themeSystems)
+    {
+        this.teardownMazeSystems();
+
+        this.minimap = themeSystems.minimap;
+        this.maze = themeSystems.maze;
+        this.mazeWorld = themeSystems.mazeWorld;
+        this.mazeGroup = themeSystems.mazeGroup;
+        this.mazeLayout = themeSystems.mazeLayout;
+        this.collisionOctree = themeSystems.collisionOctree;
+
+        this.minimap.mount?.();
+        this.mazeWorld.mount?.();
+
+        window.generatedMazeLayout = this.mazeLayout;
+        window.generatedCollisionOctree = this.collisionOctree;
+
+        if (!this.controls)
+        {
+            this.controls = new FirstPersonPlayerController(
+                this.camera,
+                this.renderer.domElement,
+                this.createPlayerSettings(this.mazeLayout)
+            );
+            this.registerUpdatable(this.controls);
+        }
+        else
+        {
+            this.controls.updateMazeContext(this.createPlayerSettings(this.mazeLayout));
+        }
+
+        this.spawnPlayerAtMazeStart();
+        this.minimap.trackPlayer(this.controls, this.mazeLayout);
+
+        this.registerUpdatable(this.minimap);
+        this.registerUpdatableTree(this.mazeGroup);
+        this.currentTheme = theme;
+    }
+
+    // Builds the maze, minimap, world geometry, collision, and player sync for one selected theme.
+    buildMazeForTheme(theme, options = {})
+    {
+        const themeSystems = this.createThemeSystems(theme, options);
+
+        try
+        {
+            this.applyThemeSystems(theme, themeSystems);
+        }
+        catch (error)
+        {
+            this.disposeThemeSystems(themeSystems);
+
+            if (this.minimap === themeSystems.minimap)
+            {
+                this.minimap = null;
+                this.maze = null;
+                this.mazeWorld = null;
+                this.mazeGroup = null;
+                this.mazeLayout = null;
+                this.collisionOctree = null;
+            }
+
+            throw error;
+        }
+    }
+
+    // Rebuilds the live maze when the user selects a different theme from the UI.
+    rebuildMaze(theme)
+    {
+        if (!theme || theme === this.currentTheme)
+        {
+            return;
+        }
+
+        const previousTheme = this.currentTheme;
+        const keepMapExpanded = this.minimap?.getIsExpanded?.() ?? false;
+
+        try
+        {
+            this.buildMazeForTheme(theme, {
+                keepMapExpanded
+            });
+        }
+        catch (error)
+        {
+            console.error(`Failed to rebuild maze theme "${theme}".`, error);
+
+            const lostLiveMaze = !this.minimap || !this.mazeWorld || !this.maze;
+
+            if (lostLiveMaze && previousTheme && previousTheme !== theme)
+            {
+                try
+                {
+                    this.buildMazeForTheme(previousTheme, {
+                        keepMapExpanded
+                    });
+                }
+                catch (fallbackError)
+                {
+                    console.error(`Failed to restore previous maze theme "${previousTheme}".`, fallbackError);
+                }
+            }
         }
     }
 
