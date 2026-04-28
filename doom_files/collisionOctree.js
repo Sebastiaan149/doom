@@ -1,5 +1,6 @@
-// This file implements a first version of the collision octree
-// NOTE: this is still a very basic implementation and we noticed it is not working correctly yet as it puts all the objects into the root node and never subdivides. This will be corrected in the next part.
+
+// Small epsilon used to tolerate numeric precision when testing containment.
+const OCTREE_EPS = 1e-8;
 
 
 // Represents one node in the collision octree.
@@ -14,6 +15,8 @@ class CollisionOctreeNode
         this.maxItems = options.maxItems ?? 12;
         this.items = [];
         this.children = null;
+        this.subdivideCount = 0;
+        this.insertCount = 0;
     }
 
     // Splits the node into eight equally sized child boxes.
@@ -23,7 +26,15 @@ class CollisionOctreeNode
         const max = this.bounds.max;
         const center = this.bounds.getCenter(new THREE.Vector3());
 
+        // Guard against degenerate subdivision when bounds have zero/near-zero size.
+        const size = this.bounds.getSize(new THREE.Vector3());
+        if (size.x <= OCTREE_EPS || size.y <= OCTREE_EPS || size.z <= OCTREE_EPS)
+        {
+            return; // cannot subdivide degenerate bounds
+        }
+
         this.children = [];
+        this.subdivideCount++;
 
         for (let xIndex = 0; xIndex < 2; xIndex++)
         {
@@ -71,7 +82,11 @@ class CollisionOctreeNode
 
         for (const child of this.children)
         {
-            if (child.bounds.containsBox(entryBox))
+            // Allow a tiny epsilon tolerance when checking containment so items that
+            // touch the split plane due to floating point round-off still get placed
+            // into the correct child when appropriate.
+            const expanded = child.bounds.clone().expandByScalar(OCTREE_EPS);
+            if (expanded.containsBox(entryBox))
             {
                 return child;
             }
@@ -83,6 +98,7 @@ class CollisionOctreeNode
     // Inserts one collision entry into this node or one of its children.
     insert(entry)
     {
+        this.insertCount++;
         if (this.children)
         {
             const containingChild = this.getContainingChild(entry.box);
@@ -179,7 +195,15 @@ class CollisionOctree
     // Rebuilds the octree from a fresh set of collision entries.
     build(entries)
     {
-        // The root node encloses every wall box, then expands slightly so queries that touch the edges of the world can still find collisions (if it should happen)
+        // Measure build time using a high-resolution timer when available so reported
+        // values are precise. Also record the number of entries for diagnostics.
+        const now = typeof performance !== "undefined" && performance.now
+            ? performance.now.bind(performance)
+            : Date.now;
+        const buildStart = now();
+
+        // The root node encloses every wall box, then expands slightly so queries that
+        // touch the edges of the world can still find collisions (if it should happen).
         const rootBounds = entries[0].box.clone();
 
         for (let index = 1; index < entries.length; index++)
@@ -189,18 +213,62 @@ class CollisionOctree
 
         rootBounds.expandByScalar(this.options.padding);
 
-        // Creates the root node and inserts every entry, which will recursively subdivide the tree as needed.
+        // Creates the root node and inserts every entry, which will recursively subdivide
+        // the tree as needed.
         this.root = new CollisionOctreeNode(rootBounds, this.options);
 
         for (const entry of entries)
         {
-            // Entries keep their own copied Box3 so tree internals cannot accidentally mutate
-            // any Box3 objects reused elsewhere in the code.
+            // Entries keep their own copied Box3 so tree internals cannot accidentally
+            // mutate any Box3 objects reused elsewhere in the code.
             this.root.insert({
                 ...entry,
                 box: entry.box.clone()
             });
         }
+
+        const buildEnd = now();
+        this.buildTimeMs = buildEnd - buildStart;
+        this.entryCount = entries.length;
+
+        // Collect diagnostics about the built tree so callers can inspect whether
+        // subdivision actually occurred and how deep the tree grew.
+        const stats = {
+            totalNodes: 0,
+            leafNodes: 0,
+            nodesWithChildren: 0,
+            totalItems: 0,
+            maxDepth: 0,
+            totalSubdivisions: 0,
+            totalInserts: 0
+        };
+
+        function collect(node)
+        {
+            stats.totalNodes++;
+            stats.totalItems += node.items.length;
+            stats.maxDepth = Math.max(stats.maxDepth, node.depth);
+            stats.totalSubdivisions += node.subdivideCount || 0;
+            stats.totalInserts += node.insertCount || 0;
+
+            if (node.children)
+            {
+                stats.nodesWithChildren++;
+                for (const c of node.children) collect(c);
+            }
+            else
+            {
+                stats.leafNodes++;
+            }
+        }
+
+        if (this.root)
+        {
+            collect(this.root);
+            stats.rootItems = this.root.items.length;
+        }
+
+        this.stats = stats;
 
         return this;
     }
