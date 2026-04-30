@@ -12,14 +12,15 @@ const MAZE_SETTINGS = {
     mazeWidth: 25,
     mazeHeight: 15,
     tileSize: 8,
-    mainTheme: "fireCave"
+    mainTheme: "castle"
 };
 
 // These settings control how the generated maze is converted into 3D world geometry.
 const MAZE_WORLD_SETTINGS = {
     tileSize: 8,
     wallHeight: 6,
-    floorY: -3
+    floorY: -3,
+    ceilingThickness: 1.05
 };
 
 // The available maze themes are exposed in the UI so the world can be regenerated on demand.
@@ -28,9 +29,123 @@ const MAZE_THEME_OPTIONS = [
     { value: "industrial", label: "Industrial" },
     { value: "oldForestTemple", label: "Old Forest Temple" },
     { value: "fireCave", label: "Fire Cave" },
-    { value: "iceCave", label: "Ice Cave" },
+    { value: "iceCave", label: "Frost Cave" },
     { value: "random", label: "Random Mix" }
 ];
+
+const MAZE_THEME_LIGHTING = {
+    castle: {
+        skyTop: 0x09101f,
+        skyBottom: 0x1e2b44,
+        hemiSky: 0xb8c6e6,
+        hemiGround: 0x2a2332,
+        hemiIntensity: 0.72,
+        ambientIntensity: 0.284,
+        sunColor: 0xe2ebff,
+        sunIntensity: 2.8,
+        sphereColor: 0xe6edff,
+        sphereScale: 1.0,
+        sphereName: "moonSphere"
+    },
+    industrial: {
+        skyTop: 0x0f241a,
+        skyBottom: 0x21362b,
+        hemiSky: 0xa8c5af,
+        hemiGround: 0x1f2a23,
+        hemiIntensity: 0.7,
+        ambientIntensity: 0.284,
+        sunColor: 0xdcf8c8,
+        sunIntensity: 2.6,
+        sphereColor: 0xdff8ce,
+        sphereScale: 1.0,
+        sphereName: "moonSphere"
+    },
+    oldForestTemple: {
+        skyTop: 0x203a22,
+        skyBottom: 0x355d31,
+        hemiSky: 0xbfd9a7,
+        hemiGround: 0x273222,
+        hemiIntensity: 0.78,
+        ambientIntensity: 0.285,
+        sunColor: 0xfff3ba,
+        sunIntensity: 3.4,
+        sphereColor: 0xfff4c4,
+        sphereScale: 1.08,
+        sphereName: "sunSphere"
+    },
+    fireCave: {
+        skyTop: 0x5a1616,
+        skyBottom: 0x9a2b1f,
+        hemiSky: 0xf2a16b,
+        hemiGround: 0x3a1711,
+        hemiIntensity: 0.76,
+        ambientIntensity: 0.285,
+        sunColor: 0xffd17a,
+        sunIntensity: 3.2,
+        sphereColor: 0xffc85c,
+        sphereScale: 1.08,
+        sphereName: "sunSphere"
+    },
+    iceCave: {
+        skyTop: 0xcfefff,
+        skyBottom: 0x86bddf,
+        hemiSky: 0xf4fbff,
+        hemiGround: 0x9dc0d7,
+        hemiIntensity: 0.95,
+        ambientIntensity: 0.28,
+        sunColor: 0xf8ffff,
+        sunIntensity: 3.2,
+        sphereColor: 0xf8ffff,
+        sphereScale: 1.02,
+        sphereName: "sunSphere"
+    },
+    random: {
+        skyTop: 0x9fd8f2,
+        skyBottom: 0xd7f0fb,
+        hemiSky: 0xeef9ff,
+        hemiGround: 0x8daca6,
+        hemiIntensity: 0.78,
+        ambientIntensity: 0.285,
+        sunColor: 0xfff2c7,
+        sunIntensity: 3.0,
+        sphereColor: 0xfff6da,
+        sphereScale: 1.0,
+        sphereName: "sunSphere"
+    }
+};
+
+const MAZE_THEME_ATMOSPHERE = {
+    castle: {
+        color: "#121b2c",
+        near: 118,
+        far: 420
+    },
+    industrial: {
+        color: "#183024",
+        near: 118,
+        far: 420
+    },
+    oldForestTemple: {
+        color: "#355a31",
+        near: 105,
+        far: 280
+    },
+    fireCave: {
+        color: "#8f281f",
+        near: 122,
+        far: 430
+    },
+    iceCave: {
+        color: "#d9f5ff",
+        near: 108,
+        far: 300
+    },
+    random: {
+        color: "#cfefff",
+        near: 82,
+        far: 420
+    }
+};
 
 // Owns the game lifecycle and the connections between all the different components.
 class World
@@ -39,19 +154,25 @@ class World
     constructor(container)
     {
         this.container = container;
+        this.currentTheme = MAZE_SETTINGS.mainTheme;
         this.camera = createCamera();
         this.renderer = createRenderer();
         this.scene = createScene();
-
-        this.loop = new Loop(this.camera, this.scene, this.renderer);
-        this.container.append(this.renderer.domElement);
-
-        // Lighting and 2D overlays are added before the maze so the UI is already present
-        // when the first rendered frame appears.
-        this.scene.add(createLights());
+        this.themeLights = createLights(this.currentTheme, MAZE_THEME_LIGHTING[this.currentTheme]);
+        this.scene.add(this.camera);
+        this.scene.add(this.themeLights);
+        attachCameraLight(this.camera);
         addControlsHint(this.container);
+        this.renderPipeline = createScreenSpaceAmbientOcclusionRenderer(
+            this.renderer,
+            this.scene,
+            this.camera
+        );
 
-        this.currentTheme = MAZE_SETTINGS.mainTheme;
+        this.loop = new Loop(this.camera, this.scene, this.renderer, this.renderPipeline);
+        this.themeLights.trackCamera?.(this.camera);
+        this.registerUpdatable(this.themeLights);
+        this.container.append(this.renderer.domElement);
         this.controls = null;
         this.minimap = null;
         this.mazeWorld = null;
@@ -59,10 +180,11 @@ class World
         this.mazeLayout = null;
         this.collisionOctree = null;
         this.maze = null;
+        this.textureDisplacementEnabled = false;
 
         this.buildMazeForTheme(this.currentTheme);
 
-        this.resizer = new Resizer(this.container, this.camera, this.renderer);
+        this.resizer = new Resizer(this.container, this.camera, this.renderer, this.renderPipeline);
     }
 
     // Registers one tickable object with the shared loop.
@@ -119,6 +241,53 @@ class World
         };
     }
 
+    applyThemeAtmosphere(theme)
+    {
+        const atmosphere = MAZE_THEME_ATMOSPHERE[theme] ?? MAZE_THEME_ATMOSPHERE.random;
+        const color = new THREE.Color(atmosphere.color);
+
+        this.scene.background = new THREE.Color(atmosphere.color);
+        this.scene.fog = new THREE.Fog(color, atmosphere.near, atmosphere.far);
+    }
+
+    clearThemeAtmosphere()
+    {
+        this.scene.background = new THREE.Color("#d9f0fb");
+        this.scene.fog = new THREE.Fog("#d9f0fb", 160, 500);
+    }
+
+    syncRenderAtmosphere()
+    {
+        this.applyThemeAtmosphere(this.currentTheme);
+        this.syncThemeLighting(this.currentTheme);
+    }
+
+    syncThemeLighting(theme = this.currentTheme)
+    {
+        if (this.themeLights)
+        {
+            this.unregisterUpdatable(this.themeLights);
+            this.scene.remove(this.themeLights);
+        }
+
+        this.themeLights = createLights(theme, MAZE_THEME_LIGHTING[theme] ?? MAZE_THEME_LIGHTING.random);
+        this.themeLights.trackCamera?.(this.camera);
+        this.scene.add(this.themeLights);
+        this.registerUpdatable(this.themeLights);
+    }
+
+    warmRenderPrograms()
+    {
+        try
+        {
+            this.renderer.compile(this.scene, this.camera);
+        }
+        catch (error)
+        {
+            console.warn("Renderer shader warmup failed.", error);
+        }
+    }
+
     // Removes the old maze/minimap instance so a new theme can be generated cleanly.
     teardownMazeSystems()
     {
@@ -165,7 +334,9 @@ class World
                 availableThemes: MAZE_THEME_OPTIONS,
                 initialExpanded: shouldKeepExpanded,
                 attachToContainer: false,
-                onThemeChange: (nextTheme) => this.rebuildMaze(nextTheme)
+                textureDisplacementEnabled: this.textureDisplacementEnabled,
+                onThemeChange: (nextTheme) => this.rebuildMaze(nextTheme),
+                onTextureDisplacementChange: (enabled) => this.setTextureDisplacementEnabled(enabled)
             });
 
             const maze = minimap.maze;
@@ -173,6 +344,14 @@ class World
                 scene: this.scene,
                 renderer: this.renderer,
                 attachToScene: false,
+                textureDisplacementEnabled: this.textureDisplacementEnabled,
+                useVisibilityCulling: false,
+                visibilityWarmupEnabled: false,
+                maxRegionLights: 1,
+                maxCorridorLights: 0,
+                maxShadowCastingLights: 6,
+                maxAmbientTileLights: 12,
+                maxAnimatedEmitterLights: 18,
                 ...MAZE_WORLD_SETTINGS
             });
 
@@ -217,8 +396,19 @@ class World
         this.mazeLayout = themeSystems.mazeLayout;
         this.collisionOctree = themeSystems.collisionOctree;
 
+        this.currentTheme = theme;
+        this.syncRenderAtmosphere();
         this.minimap.mount?.();
         this.mazeWorld.mount?.();
+        this.mazeWorld.whenTexturesReady?.().then(() =>
+        {
+            if (this.mazeWorld !== themeSystems.mazeWorld)
+            {
+                return;
+            }
+
+            this.renderNow();
+        });
 
         window.generatedMazeLayout = this.mazeLayout;
         window.generatedCollisionOctree = this.collisionOctree;
@@ -238,11 +428,13 @@ class World
         }
 
         this.spawnPlayerAtMazeStart();
+        this.mazeWorld.trackPlayer?.(this.controls);
+        this.controls.onTeleport = () => this.mazeWorld?.updateVisibilityNow?.();
         this.minimap.trackPlayer(this.controls, this.mazeLayout);
 
         this.registerUpdatable(this.minimap);
         this.registerUpdatableTree(this.mazeGroup);
-        this.currentTheme = theme;
+        this.warmRenderPrograms();
     }
 
     // Builds the maze, minimap, world geometry, collision, and player sync for one selected theme.
@@ -309,6 +501,86 @@ class World
                 }
             }
         }
+    }
+
+    rebuildMazeRenderingForCurrentMaze()
+    {
+        if (!this.maze)
+        {
+            return;
+        }
+
+        const previousMazeWorld = this.mazeWorld;
+        const previousMazeGroup = this.mazeGroup;
+
+        if (previousMazeGroup)
+        {
+            this.unregisterUpdatableTree(previousMazeGroup);
+        }
+
+        const nextMazeWorld = buildMazeWorldFromData(this.maze, {
+            scene: this.scene,
+            renderer: this.renderer,
+            attachToScene: false,
+            textureDisplacementEnabled: this.textureDisplacementEnabled,
+            useVisibilityCulling: false,
+            visibilityWarmupEnabled: false,
+            maxRegionLights: 1,
+            maxCorridorLights: 0,
+            maxShadowCastingLights: 6,
+            maxAmbientTileLights: 12,
+            maxAnimatedEmitterLights: 18,
+            ...MAZE_WORLD_SETTINGS
+        });
+
+        previousMazeWorld?.dispose?.();
+
+        this.mazeWorld = nextMazeWorld;
+        this.mazeGroup = nextMazeWorld.group;
+        this.mazeLayout = nextMazeWorld.layout;
+        this.collisionOctree = nextMazeWorld.collisionOctree;
+
+        this.mazeWorld.mount?.();
+        this.controls.updateMazeContext(this.createPlayerSettings(this.mazeLayout));
+        this.mazeWorld.trackPlayer?.(this.controls);
+        this.controls.onTeleport = () => this.mazeWorld?.updateVisibilityNow?.();
+        this.minimap.trackPlayer(this.controls, this.mazeLayout);
+
+        window.generatedMazeLayout = this.mazeLayout;
+        window.generatedCollisionOctree = this.collisionOctree;
+
+        this.registerUpdatableTree(this.mazeGroup);
+        this.syncRenderAtmosphere();
+        this.warmRenderPrograms();
+        this.mazeWorld.whenTexturesReady?.().then(() =>
+        {
+            if (this.mazeWorld !== nextMazeWorld)
+            {
+                return;
+            }
+
+            this.renderNow();
+        });
+    }
+
+    // Toggles the displacement rendering pipeline without regenerating the maze data.
+    setTextureDisplacementEnabled(enabled)
+    {
+        const nextEnabled = !!enabled;
+
+        if (nextEnabled === this.textureDisplacementEnabled)
+        {
+            return;
+        }
+
+        this.textureDisplacementEnabled = !!enabled;
+        this.rebuildMazeRenderingForCurrentMaze();
+        this.renderNow();
+    }
+
+    renderNow()
+    {
+        this.loop.render();
     }
 
     // Places the player on the generated start tile and aims the first view toward the maze goal.

@@ -69,13 +69,13 @@ function generateMazeMap(width, height, options = {})
                     name: "castleBrickPassage",
                     wallMaterial: "castleBrickWall",
                     floorType: "castleStoneFloor",
-                    detailFloorTypes: ["castleCrackedStone", "castleMossStone", "castleRuneTile"]
+                    detailFloorTypes: ["castleCrackedTile", "castleTileFloor", "castleStoneFloor"]
                 },
                 {
                     name: "castleStonePassage",
                     wallMaterial: "castleStoneWall",
                     floorType: "castleTileFloor",
-                    detailFloorTypes: ["castleCrackedTile", "castleMossStone", "castleRuneTile"]
+                    detailFloorTypes: ["castleCrackedTile", "castleStoneFloor", "castleTileFloor"]
                 }
             ],
             roomThemes: [
@@ -83,13 +83,13 @@ function generateMazeMap(width, height, options = {})
                     name: "castleHallBrick",
                     wallMaterial: "castleBrickWall",
                     floorType: "castleStoneFloor",
-                    detailFloorTypes: ["castleCrackedStone", "castleMossStone", "castleBannerTile"]
+                    detailFloorTypes: ["castleCrackedTile", "castleTileFloor", "castleStoneFloor"]
                 },
                 {
                     name: "castleHallStone",
                     wallMaterial: "castleStoneWall",
                     floorType: "castleTileFloor",
-                    detailFloorTypes: ["castleCrackedTile", "castleRuneTile", "castleBannerTile"]
+                    detailFloorTypes: ["castleCrackedTile", "castleStoneFloor", "castleTileFloor"]
                 }
             ]
         },
@@ -100,13 +100,13 @@ function generateMazeMap(width, height, options = {})
                     name: "industrialMetalCorridor",
                     wallMaterial: "industrialDarkMetalWall",
                     floorType: "industrialMetalFloor",
-                    detailFloorTypes: ["industrialGrateFloor", "industrialOilFloor", "industrialPatchFloor"]
+                    detailFloorTypes: ["industrialGrateFloor", "industrialDarkTileFloor", "industrialConcreteFloor"]
                 },
                 {
                     name: "industrialServiceCorridor",
                     wallMaterial: "industrialPanelWall",
                     floorType: "industrialGrateFloor",
-                    detailFloorTypes: ["industrialMetalFloor", "industrialBrokenFloor", "industrialOilFloor"]
+                    detailFloorTypes: ["industrialMetalFloor", "industrialDarkTileFloor", "industrialConcreteFloor"]
                 }
             ],
             roomThemes: [
@@ -114,13 +114,13 @@ function generateMazeMap(width, height, options = {})
                     name: "industrialWorkshop",
                     wallMaterial: "industrialDarkMetalWall",
                     floorType: "industrialConcreteFloor",
-                    detailFloorTypes: ["industrialGrateFloor", "industrialPatchFloor", "industrialOilFloor"]
+                    detailFloorTypes: ["industrialGrateFloor", "industrialMetalFloor", "industrialDarkTileFloor"]
                 },
                 {
                     name: "industrialStorage",
                     wallMaterial: "industrialConcreteWall",
                     floorType: "industrialDarkTileFloor",
-                    detailFloorTypes: ["industrialBrokenFloor", "industrialPatchFloor", "industrialOilFloor"]
+                    detailFloorTypes: ["industrialConcreteFloor", "industrialMetalFloor", "industrialGrateFloor"]
                 }
             ]
         },
@@ -131,13 +131,13 @@ function generateMazeMap(width, height, options = {})
                     name: "forestTempleMossPassage",
                     wallMaterial: "forestTempleMossWall",
                     floorType: "forestTempleStoneFloor",
-                    detailFloorTypes: ["forestTempleRootFloor", "forestTempleMossFloor", "forestTempleRuneFloor"]
+                    detailFloorTypes: ["forestTempleRockFloor", "forestTempleMossFloor", "forestTempleStoneFloor"]
                 },
                 {
                     name: "forestTempleRootPassage",
                     wallMaterial: "forestTempleRootWall",
                     floorType: "forestTempleMossFloor",
-                    detailFloorTypes: ["forestTempleStoneFloor", "forestTempleVineFloor", "forestTempleRuneFloor"]
+                    detailFloorTypes: ["forestTempleStoneFloor", "forestTempleRockFloor", "forestTempleMossFloor"]
                 }
             ],
             roomThemes: [
@@ -145,13 +145,13 @@ function generateMazeMap(width, height, options = {})
                     name: "forestTempleSanctum",
                     wallMaterial: "forestTempleMossWall",
                     floorType: "forestTempleStoneFloor",
-                    detailFloorTypes: ["forestTempleRuneFloor", "forestTempleMossFloor", "forestTempleVineFloor"]
+                    detailFloorTypes: ["forestTempleRockFloor", "forestTempleMossFloor", "forestTempleStoneFloor"]
                 },
                 {
                     name: "forestTempleChamber",
                     wallMaterial: "forestTempleRootWall",
                     floorType: "forestTempleMossFloor",
-                    detailFloorTypes: ["forestTempleRootFloor", "forestTempleRuneFloor", "forestTempleVineFloor"]
+                    detailFloorTypes: ["forestTempleRockFloor", "forestTempleStoneFloor", "forestTempleMossFloor"]
                 }
             ]
         },
@@ -161,28 +161,28 @@ function generateMazeMap(width, height, options = {})
                 {
                     name: "fireCaveAshTunnel",
                     wallMaterial: "fireCaveBasaltWall",
-                    floorType: "fireCaveAshFloor",
-                    detailFloorTypes: ["fireCaveLavaCrackFloor", "fireCaveEmberFloor", "fireCaveScorchFloor"]
+                    floorType: "fireCaveStoneFloor",
+                    detailFloorTypes: ["fireCaveLavaFloor", "fireCaveScorchFloor", "fireCaveStoneFloor"]
                 },
                 {
                     name: "fireCaveMagmaTunnel",
                     wallMaterial: "fireCaveObsidianWall",
-                    floorType: "fireCaveDarkBasaltFloor",
-                    detailFloorTypes: ["fireCaveLavaCrackFloor", "fireCaveEmberFloor", "fireCaveScorchFloor"]
+                    floorType: "fireCaveScorchFloor",
+                    detailFloorTypes: ["fireCaveLavaFloor", "fireCaveStoneFloor", "fireCaveScorchFloor"]
                 }
             ],
             roomThemes: [
                 {
                     name: "fireCaveChamber",
                     wallMaterial: "fireCaveBasaltWall",
-                    floorType: "fireCaveAshFloor",
-                    detailFloorTypes: ["fireCaveEmberFloor", "fireCaveScorchFloor", "fireCaveLavaCrackFloor"]
+                    floorType: "fireCaveStoneFloor",
+                    detailFloorTypes: ["fireCaveScorchFloor", "fireCaveLavaFloor", "fireCaveStoneFloor"]
                 },
                 {
                     name: "fireCaveVault",
                     wallMaterial: "fireCaveObsidianWall",
-                    floorType: "fireCaveDarkBasaltFloor",
-                    detailFloorTypes: ["fireCaveEmberFloor", "fireCaveLavaCrackFloor", "fireCaveScorchFloor"]
+                    floorType: "fireCaveScorchFloor",
+                    detailFloorTypes: ["fireCaveLavaFloor", "fireCaveStoneFloor", "fireCaveScorchFloor"]
                 }
             ]
         },
@@ -192,28 +192,28 @@ function generateMazeMap(width, height, options = {})
                 {
                     name: "iceCaveBluePassage",
                     wallMaterial: "iceCaveBlueIceWall",
-                    floorType: "iceCavePackedSnowFloor",
-                    detailFloorTypes: ["iceCaveCrystalFloor", "iceCaveSlipperyIceFloor", "iceCaveFrostFloor"]
+                    floorType: "iceCaveSnowFloor",
+                    detailFloorTypes: ["iceCaveFrostFloor", "iceCaveSnowFloor"]
                 },
                 {
                     name: "iceCaveCrystalPassage",
                     wallMaterial: "iceCaveCrystalWall",
-                    floorType: "iceCaveIceFloor",
-                    detailFloorTypes: ["iceCaveCrystalFloor", "iceCaveFrostFloor", "iceCavePackedSnowFloor"]
+                    floorType: "iceCaveFrostFloor",
+                    detailFloorTypes: ["iceCaveSnowFloor", "iceCaveFrostFloor"]
                 }
             ],
             roomThemes: [
                 {
                     name: "iceCaveHall",
                     wallMaterial: "iceCaveBlueIceWall",
-                    floorType: "iceCaveIceFloor",
-                    detailFloorTypes: ["iceCaveCrystalFloor", "iceCaveFrostFloor", "iceCavePackedSnowFloor"]
+                    floorType: "iceCaveSnowFloor",
+                    detailFloorTypes: ["iceCaveFrostFloor", "iceCaveSnowFloor"]
                 },
                 {
                     name: "iceCaveVault",
                     wallMaterial: "iceCaveCrystalWall",
-                    floorType: "iceCavePackedSnowFloor",
-                    detailFloorTypes: ["iceCaveCrystalFloor", "iceCaveSlipperyIceFloor", "iceCaveFrostFloor"]
+                    floorType: "iceCaveFrostFloor",
+                    detailFloorTypes: ["iceCaveSnowFloor", "iceCaveFrostFloor"]
                 }
             ]
         }
@@ -1776,36 +1776,22 @@ function generateMazeMap(width, height, options = {})
         const floorSymbolMap = {
             castleStoneFloor: ".",
             castleTileFloor: ":",
-            castleCrackedStone: ";",
             castleCrackedTile: "=",
-            castleMossStone: "\"",
-            castleRuneTile: "*",
-            castleBannerTile: "+",
 
             industrialMetalFloor: ",",
             industrialGrateFloor: "-",
             industrialConcreteFloor: "_",
             industrialDarkTileFloor: "~",
-            industrialOilFloor: "!",
-            industrialPatchFloor: "%",
-            industrialBrokenFloor: "?",
 
             forestTempleStoneFloor: "g",
             forestTempleMossFloor: "h",
-            forestTempleRootFloor: "j",
-            forestTempleVineFloor: "v",
-            forestTempleRuneFloor: "u",
+            forestTempleRockFloor: "j",
 
-            fireCaveAshFloor: "a",
-            fireCaveDarkBasaltFloor: "b",
-            fireCaveLavaCrackFloor: "l",
-            fireCaveEmberFloor: "e",
+            fireCaveStoneFloor: "a",
+            fireCaveLavaFloor: "l",
             fireCaveScorchFloor: "q",
 
-            iceCavePackedSnowFloor: "n",
-            iceCaveIceFloor: "i",
-            iceCaveCrystalFloor: "c",
-            iceCaveSlipperyIceFloor: "s",
+            iceCaveSnowFloor: "n",
             iceCaveFrostFloor: "f",
 
             // Some special tiles
@@ -1902,36 +1888,22 @@ function asciiToTileMapCanvas(ascii, tileSize)
 
         ".": "#c9bea8",
         ":": "#dbcfae",
-        ";": "#baa98f",
         "=": "#d7c38f",
-        "\"": "#a2b886",
-        "*": "#e6d789",
-        "+": "#d7b778",
 
         ",": "#b7c4cf",
         "-": "#d3dce1",
         "_": "#c8c1b6",
         "~": "#a7a0ab",
-        "!": "#8b7c53",
-        "%": "#d8d3ca",
-        "?": "#9f9384",
 
         "g": "#b9c1a1",
         "h": "#b8d48d",
         "j": "#c0a276",
-        "v": "#8fd97d",
-        "u": "#e4dd95",
 
         "a": "#d9b191",
-        "b": "#aaa09b",
         "l": "#ff9c5a",
-        "e": "#ffd56c",
         "q": "#b88c6d",
 
         "n": "#eef4fb",
-        "i": "#c7ebff",
-        "c": "#dffcff",
-        "s": "#b4e1ff",
         "f": "#f7fcff",
 
         "T": "#db4fff",
