@@ -46,6 +46,7 @@ class Loop
         }
     }
 
+    // Draws the current frame, optionally routing through a post-process pipeline.
     render()
     {
         if (this.renderPipeline?.render)

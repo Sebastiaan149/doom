@@ -243,6 +243,7 @@ class CollisionOctree
             totalInserts: 0
         };
 
+        // Walks the finished tree once so diagnostics can report its final shape.
         function collect(node)
         {
             stats.totalNodes++;
@@ -276,7 +277,7 @@ class CollisionOctree
     // Returns every collision entry that overlaps the provided query box.
     query(queryBox, results = [])
     {
-        // Reusing the same result array avoids a lots of unnecessary allocations during player movement.
+        // Reusing the same result array avoids a lot of unnecessary allocations during player movement.
         results.length = 0;
 
         if (!this.root)

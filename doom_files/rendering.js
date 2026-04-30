@@ -19,6 +19,7 @@ function createCamera(options = {})
     return camera;
 }
 
+// Theme presets define the shared sky rig that still feeds the maze's indoor lighting.
 const THEME_LIGHT_PRESETS = {
     castle: {
         skyTop: 0x080f1c,
@@ -281,6 +282,7 @@ const setRenderSize = (container, camera, renderer, renderPipeline = null) =>
 {
     setSize(container, camera, renderer);
 
+    // Post-process passes operate on the final pixel dimensions of the renderer output.
     if (renderPipeline?.setSize)
     {
         renderPipeline.setSize(

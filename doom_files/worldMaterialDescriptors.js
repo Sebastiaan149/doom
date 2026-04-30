@@ -51,6 +51,7 @@ function inferSurfaceFamily(identifier = "")
     return "neutral";
 }
 
+// Builds a conventional texture-path bundle for one wall material set.
 function createWallTextureMaps(folderName, fileBaseName, options = {})
 {
     const rootPath = `./assets/textures/wall/${folderName}/${fileBaseName}`;
@@ -83,6 +84,7 @@ function createWallTextureMaps(folderName, fileBaseName, options = {})
     return maps;
 }
 
+// Builds a conventional texture-path bundle for one floor or ceiling material set.
 function createFloorTextureMaps(folderName, fileBaseName, options = {})
 {
     const rootPath = `./assets/textures/floor/${folderName}/${fileBaseName}`;
@@ -279,11 +281,15 @@ const WALL_TEXTURE_DESCRIPTORS = {
         color: "#e7fbff",
         roughness: 0.28,
         metalness: 0.08,
-        normalScale: 1.22,
+        normalScale: 1.08,
         bumpScale: 0,
         aoMapIntensity: 1.05,
-        displacementScale: 0.035,
-        displacementBias: -0.0175
+        displacementScale: 0.052,
+        displacementBias: -0.026,
+        displacementEdgeFadeDistance: 0.12,
+        displacementCornerFadePower: 1.55,
+        displacementContrast: 3.9,
+        displacementSharpness: 2.7
     },
     icecavecrystalwall: {
         textureMaps: createWallTextureMaps("iceCaveCrystalWall", "iceCaveCrystalWall", {
@@ -518,6 +524,7 @@ const FLOOR_TEXTURE_DESCRIPTORS = {
     }
 };
 
+// Applies wall-specific texture metadata and the default displacement tuning used by the shader.
 function applyWallTextureDescriptor(descriptor, normalizedKey)
 {
     const textureDescriptor = WALL_TEXTURE_DESCRIPTORS[normalizedKey];
@@ -531,10 +538,11 @@ function applyWallTextureDescriptor(descriptor, normalizedKey)
 
     descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.18);
     descriptor.displacementCornerFadePower ??= 1.8;
-    descriptor.displacementContrast ??= 2.8;
-    descriptor.displacementSharpness ??= 2.0;
+    descriptor.displacementContrast ??= 3.6;
+    descriptor.displacementSharpness ??= 2.5;
 }
 
+// Applies floor-specific texture metadata and slightly softer displacement defaults than walls.
 function applyFloorTextureDescriptor(descriptor, normalizedKey)
 {
     const textureDescriptor = FLOOR_TEXTURE_DESCRIPTORS[normalizedKey];
@@ -548,8 +556,8 @@ function applyFloorTextureDescriptor(descriptor, normalizedKey)
 
     descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.16);
     descriptor.displacementCornerFadePower ??= 1.6;
-    descriptor.displacementContrast ??= 2.4;
-    descriptor.displacementSharpness ??= 1.8;
+    descriptor.displacementContrast ??= 3.1;
+    descriptor.displacementSharpness ??= 2.2;
 }
 
 // Creates the recipe that describes how one surface should look and feel.

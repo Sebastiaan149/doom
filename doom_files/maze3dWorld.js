@@ -664,44 +664,15 @@ function buildMazeWorldFromData(maze, options = {})
 
     // The octree is built once when the maze is created. After that, player collision queries
     // can ask for nearby walls, ceilings, and props instead of testing every object in the maze.
-    // Prefer the high-resolution timer and present more precision. If the octree recorded
-    // its own internal build time, prefer that value as it measures exactly the work done
-    // inside the octree implementation (including inserts and any subdivides).
-    const now = typeof performance !== "undefined" && performance.now
-        ? performance.now.bind(performance)
-        : Date.now;
-
     collisionEntries.push(...decorationLayer.collisionEntries);
     const collisionOctree = createCollisionOctree(collisionEntries);
-
-    // Use the octree's internal timing if available.
-    let octreeBuildMs = typeof collisionOctree.buildTimeMs === "number"
-        ? collisionOctree.buildTimeMs
-        : NaN;
-
-    // If the measured build time is extremely small (zero because of timer
-    // resolution), run a quick micro-benchmark that rebuilds the octree several
-    // times and averages the result so the reported number is meaningful.
-    if (!Number.isFinite(octreeBuildMs) || octreeBuildMs < 0.001)
-    {
-        const runs = 30;
-        const benchStart = now();
-        for (let i = 0; i < runs; i++)
-        {
-            // Recreate the octree to measure the same work the constructor does.
-            createCollisionOctree(collisionEntries);
-        }
-        const benchEnd = now();
-        octreeBuildMs = (benchEnd - benchStart) / runs;
-    }
-
-    collisionOctree.buildTimeMs = octreeBuildMs;
+    const octreeBuildTimeMs = collisionOctree.buildTimeMs ?? 0;
     group.userData.collisionOctree = collisionOctree;
-    group.userData.collisionOctreeBuildMs = octreeBuildMs;
+    group.userData.collisionOctreeBuildMs = octreeBuildTimeMs;
 
-    // Log with microsecond precision to make very fast builds visible.
-    const octreeBuildUs = octreeBuildMs * 1000;
-    console.info(`Octree build: ${octreeBuildMs.toFixed(6)} ms (${Math.round(octreeBuildUs)} us, ${collisionEntries.length} entries)`);
+    console.info(
+        `Octree build: ${octreeBuildTimeMs.toFixed(6)} ms (${collisionEntries.length} entries)`
+    );
 
     group.add(decorationLayer.group);
 
@@ -748,7 +719,7 @@ function buildMazeWorldFromData(maze, options = {})
         group,
         layout,
         collisionOctree,
-        octreeBuildTimeMs: octreeBuildMs,
+        octreeBuildTimeMs,
         mount,
         trackPlayer(playerController)
         {

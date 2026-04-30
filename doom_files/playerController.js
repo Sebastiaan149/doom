@@ -27,6 +27,7 @@ const MOVEMENT_BINDINGS = [
     }
 ];
 
+// Handles first-person movement, pointer-lock look input, jumping, and octree-backed collision.
 class FirstPersonPlayerController
 {
     // Creates the player controller and stores the movement, jumping and collision settings.
@@ -56,6 +57,7 @@ class FirstPersonPlayerController
         this.pitch = 0;
         this.yaw = 0;
 
+        // These scratch objects are reused every frame so movement/collision code stays allocation-light.
         this.worldUp = new THREE.Vector3(0, 1, 0);
         this.moveInput = new THREE.Vector3();
         this.frameMovement = new THREE.Vector3();

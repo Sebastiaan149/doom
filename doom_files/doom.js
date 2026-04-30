@@ -243,6 +243,50 @@ class World
         };
     }
 
+    // Centralizes the world-builder options so every rebuild path uses the same settings.
+    getMazeWorldBuildOptions(overrides = {})
+    {
+        return {
+            scene: this.scene,
+            renderer: this.renderer,
+            attachToScene: false,
+            textureDisplacementEnabled: this.textureDisplacementEnabled,
+            useVisibilityCulling: false,
+            visibilityWarmupEnabled: false,
+            maxRegionLights: 1,
+            maxCorridorLights: 0,
+            maxShadowCastingLights: 6,
+            maxAmbientTileLights: 12,
+            maxAnimatedEmitterLights: 18,
+            ...MAZE_WORLD_SETTINGS,
+            ...overrides
+        };
+    }
+
+    // Renders one frame once the active maze world's textures are ready.
+    refreshWhenMazeWorldTexturesReady(mazeWorld)
+    {
+        mazeWorld?.whenTexturesReady?.().then(() =>
+        {
+            if (this.mazeWorld !== mazeWorld)
+            {
+                return;
+            }
+
+            this.renderNow();
+        });
+    }
+
+    // Rebinds the teleport callback so visibility refresh follows the active maze instance.
+    bindMazeWorldTeleportRefresh()
+    {
+        if (this.controls)
+        {
+            this.controls.onTeleport = () => this.mazeWorld?.updateVisibilityNow?.();
+        }
+    }
+
+    // Updates the scene background and fog to match the active theme.
     applyThemeAtmosphere(theme)
     {
         const atmosphere = MAZE_THEME_ATMOSPHERE[theme] ?? MAZE_THEME_ATMOSPHERE.random;
@@ -264,6 +308,7 @@ class World
         this.syncThemeLighting(this.currentTheme);
     }
 
+    // Rebuilds the global light rig so each theme can swap ambient colors cleanly.
     syncThemeLighting(theme = this.currentTheme)
     {
         if (this.themeLights)
@@ -278,6 +323,7 @@ class World
         this.registerUpdatable(this.themeLights);
     }
 
+    // Cancels any scheduled shader warmup before a new rebuild replaces the world.
     clearWarmRenderPrograms()
     {
         if (typeof window === "undefined")
@@ -299,6 +345,7 @@ class World
         this.pendingWarmupTimeoutId = null;
     }
 
+    // Precompiles renderer programs after rebuilds so the first visible frames hitch less.
     warmRenderPrograms()
     {
         this.clearWarmRenderPrograms();
@@ -400,20 +447,7 @@ class World
             });
 
             const maze = minimap.maze;
-            mazeWorld = buildMazeWorldFromData(maze, {
-                scene: this.scene,
-                renderer: this.renderer,
-                attachToScene: false,
-                textureDisplacementEnabled: this.textureDisplacementEnabled,
-                useVisibilityCulling: false,
-                visibilityWarmupEnabled: false,
-                maxRegionLights: 1,
-                maxCorridorLights: 0,
-                maxShadowCastingLights: 6,
-                maxAmbientTileLights: 12,
-                maxAnimatedEmitterLights: 18,
-                ...MAZE_WORLD_SETTINGS
-            });
+            mazeWorld = buildMazeWorldFromData(maze, this.getMazeWorldBuildOptions());
 
             return {
                 minimap,
@@ -460,15 +494,7 @@ class World
         this.syncRenderAtmosphere();
         this.minimap.mount?.();
         this.mazeWorld.mount?.();
-        this.mazeWorld.whenTexturesReady?.().then(() =>
-        {
-            if (this.mazeWorld !== themeSystems.mazeWorld)
-            {
-                return;
-            }
-
-            this.renderNow();
-        });
+        this.refreshWhenMazeWorldTexturesReady(themeSystems.mazeWorld);
 
         window.generatedMazeLayout = this.mazeLayout;
         window.generatedCollisionOctree = this.collisionOctree;
@@ -489,7 +515,7 @@ class World
 
         this.spawnPlayerAtMazeStart();
         this.mazeWorld.trackPlayer?.(this.controls);
-        this.controls.onTeleport = () => this.mazeWorld?.updateVisibilityNow?.();
+        this.bindMazeWorldTeleportRefresh();
         this.minimap.trackPlayer(this.controls, this.mazeLayout);
 
         this.registerUpdatable(this.minimap);
@@ -580,20 +606,7 @@ class World
             this.unregisterUpdatableTree(previousMazeGroup);
         }
 
-        const nextMazeWorld = buildMazeWorldFromData(this.maze, {
-            scene: this.scene,
-            renderer: this.renderer,
-            attachToScene: false,
-            textureDisplacementEnabled: this.textureDisplacementEnabled,
-            useVisibilityCulling: false,
-            visibilityWarmupEnabled: false,
-            maxRegionLights: 1,
-            maxCorridorLights: 0,
-            maxShadowCastingLights: 6,
-            maxAmbientTileLights: 12,
-            maxAnimatedEmitterLights: 18,
-            ...MAZE_WORLD_SETTINGS
-        });
+        const nextMazeWorld = buildMazeWorldFromData(this.maze, this.getMazeWorldBuildOptions());
 
         previousMazeWorld?.dispose?.();
 
@@ -605,7 +618,7 @@ class World
         this.mazeWorld.mount?.();
         this.controls.updateMazeContext(this.createPlayerSettings(this.mazeLayout));
         this.mazeWorld.trackPlayer?.(this.controls);
-        this.controls.onTeleport = () => this.mazeWorld?.updateVisibilityNow?.();
+        this.bindMazeWorldTeleportRefresh();
         this.minimap.trackPlayer(this.controls, this.mazeLayout);
 
         window.generatedMazeLayout = this.mazeLayout;
@@ -614,15 +627,7 @@ class World
         this.registerUpdatableTree(this.mazeGroup);
         this.syncRenderAtmosphere();
         this.warmRenderPrograms();
-        this.mazeWorld.whenTexturesReady?.().then(() =>
-        {
-            if (this.mazeWorld !== nextMazeWorld)
-            {
-                return;
-            }
-
-            this.renderNow();
-        });
+        this.refreshWhenMazeWorldTexturesReady(nextMazeWorld);
     }
 
     // Toggles the displacement rendering pipeline without regenerating the maze data.
@@ -640,6 +645,7 @@ class World
         this.renderNow();
     }
 
+    // Renders one immediate frame outside the normal animation-loop cadence.
     renderNow()
     {
         this.loop.render();

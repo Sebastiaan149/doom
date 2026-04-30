@@ -1,5 +1,6 @@
 /* This file styles the fullscreen scene, minimap overlay, and first-person HUD. */
 
+/* Page shell */
 /* Base page layout keeps the game pinned to the full browser window. */
 html,
 body {
@@ -25,6 +26,7 @@ body {
   display: block;
 }
 
+/* Minimap shell */
 /* The minimap card anchors the map in the top-right corner. */
 .maze-map-overlay {
   position: absolute;
@@ -159,6 +161,7 @@ body {
   margin-bottom: 10px;
 }
 
+/* Minimap drawing surfaces */
 /* The base minimap uses nearest-neighbor scaling for crisp tile edges. */
 .maze-map-canvas {
   display: block;
@@ -212,6 +215,7 @@ body {
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
 }
 
+/* HUD */
 /* The controls hint explains how to enter first-person mode. */
 .controls-overlay {
   position: absolute;

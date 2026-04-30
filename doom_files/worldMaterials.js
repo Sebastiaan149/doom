@@ -16,6 +16,7 @@ function createMazeWorldMaterialLibrary(options = {})
             : 1;
     const imageTextureLoader = new THREE.TextureLoader();
 
+    // These caches let rebuilt mazes reuse textures/materials instead of recreating everything per tile.
     const baseTextureCache = new Map();
     const sharedMaterialCache = new Map();
     const wallMaterialSetCache = new Map();
@@ -1006,7 +1007,6 @@ function createMazeWorldMaterialLibrary(options = {})
             texture.encoding = THREE.sRGBEncoding;
         }
 
-        texture.needsUpdate = true;
         ownedTextureSet.add(texture);
 
         return texture;
@@ -1044,6 +1044,10 @@ function createMazeWorldMaterialLibrary(options = {})
         if (!sharedMaterialCache.has(cacheKey))
         {
             const textureParameters = createMaterialTextureParameters(descriptor);
+            const {
+                specularMap,
+                ...materialTextureParameters
+            } = textureParameters;
             const minimumRoughness =
                 descriptor.surfaceKind === "wall" || descriptor.surfaceKind === "ceiling"
                     ? (descriptor.family === "iceCave" ? 0.22 : 0.86)
@@ -1054,7 +1058,7 @@ function createMazeWorldMaterialLibrary(options = {})
                     : (descriptor.family === "iceCave" ? 0.12 : 0.06);
             const materialParameters = {
                 color: options.color ?? descriptor.color ?? "#ffffff",
-                ...textureParameters,
+                ...materialTextureParameters,
                 roughness: Math.max(options.roughness ?? descriptor.roughness, minimumRoughness),
                 metalness: Math.min(options.metalness ?? descriptor.metalness, maximumMetalness),
                 emissive: options.emissive ?? descriptor.emissive,
@@ -1065,9 +1069,9 @@ function createMazeWorldMaterialLibrary(options = {})
 
             // Three r127's standard material does not use specularMap directly. Keep spec maps
             // active by using them as the available gloss/roughness source when no roughness map exists.
-            if (textureParameters.specularMap && !textureParameters.roughnessMap)
+            if (specularMap && !textureParameters.roughnessMap)
             {
-                materialParameters.roughnessMap = textureParameters.specularMap;
+                materialParameters.roughnessMap = specularMap;
             }
 
             if (textureParameters.bumpMap)
@@ -1092,8 +1096,8 @@ function createMazeWorldMaterialLibrary(options = {})
             {
                 const rawDisplacementScale = options.displacementScale ?? descriptor.displacementScale ?? 0.1;
                 const rawDisplacementBias = options.displacementBias ?? descriptor.displacementBias ?? 0;
-                const displacementScaleBoost = options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5;
-                const displacementBiasBoost = options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5;
+                const displacementScaleBoost = options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.9;
+                const displacementBiasBoost = options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.65;
 
                 // Keep real geometry displacement controlled; stronger normal maps provide
                 // the visible micro-depth while the vertex displacement gives actual relief.
@@ -1108,13 +1112,13 @@ function createMazeWorldMaterialLibrary(options = {})
             const material = new THREE.MeshStandardMaterial(materialParameters);
             material.shadowSide = options.shadowSide ?? THREE.FrontSide;
             material.userData.displacementScale = (options.displacementScale ?? descriptor.displacementScale ?? 0.1)
-                * (options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5);
+                * (options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.9);
             material.userData.displacementBias = (options.displacementBias ?? descriptor.displacementBias ?? 0)
-                * (options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5);
+                * (options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.65);
             material.userData.displacementEdgeFade = options.displacementEdgeFade ?? descriptor.displacementEdgeFade ?? descriptor.displacementEdgeFadeDistance ?? 0.11;
             material.userData.displacementCornerFadePower = options.displacementCornerFadePower ?? descriptor.displacementCornerFadePower ?? 1.45;
-            material.userData.displacementContrast = options.displacementContrast ?? descriptor.displacementContrast ?? 2.6;
-            material.userData.displacementSharpness = options.displacementSharpness ?? descriptor.displacementSharpness ?? 1.9;
+            material.userData.displacementContrast = options.displacementContrast ?? descriptor.displacementContrast ?? 3.4;
+            material.userData.displacementSharpness = options.displacementSharpness ?? descriptor.displacementSharpness ?? 2.45;
 
             // Fade geometry displacement only at the outer edge of each tile face. This keeps
             // neighboring tiles from separating at corners while still letting the texture relief

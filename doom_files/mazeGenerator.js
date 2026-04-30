@@ -302,6 +302,102 @@ function generateMazeMap(width, height, options = {})
         return array[Math.floor(random() * array.length)];
     }
 
+    // Derive a small family-local wall palette so each region can stay on-theme
+    // while still breaking up long, uniform wall stretches.
+    function getWallMaterialVariants(primaryWallMaterial)
+    {
+        const normalizedMaterial = String(primaryWallMaterial ?? "").toLowerCase();
+
+        if (normalizedMaterial.includes("castle"))
+        {
+            return [
+                primaryWallMaterial,
+                ...(primaryWallMaterial === "castleBrickWall" ? ["castleStoneWall"] : ["castleBrickWall"])
+            ];
+        }
+
+        if (normalizedMaterial.includes("industrial"))
+        {
+            const candidates = [
+                "industrialDarkMetalWall",
+                "industrialPanelWall",
+                "industrialConcreteWall"
+            ];
+
+            return [
+                primaryWallMaterial,
+                ...candidates.filter((material) => material !== primaryWallMaterial)
+            ];
+        }
+
+        if (normalizedMaterial.includes("foresttemple"))
+        {
+            return [
+                primaryWallMaterial,
+                ...(primaryWallMaterial === "forestTempleMossWall" ? ["forestTempleRootWall"] : ["forestTempleMossWall"])
+            ];
+        }
+
+        if (normalizedMaterial.includes("firecave"))
+        {
+            return [
+                primaryWallMaterial,
+                ...(primaryWallMaterial === "fireCaveBasaltWall" ? ["fireCaveObsidianWall"] : ["fireCaveBasaltWall"])
+            ];
+        }
+
+        if (normalizedMaterial.includes("icecave"))
+        {
+            return [
+                primaryWallMaterial,
+                ...(primaryWallMaterial === "iceCaveBlueIceWall" ? ["iceCaveCrystalWall"] : ["iceCaveBlueIceWall"])
+            ];
+        }
+
+        return [primaryWallMaterial ?? "voidRockWall"];
+    }
+
+    function hashWallVariation(x, y, regionId)
+    {
+        const seedX = Math.imul(x + 1, 73856093);
+        const seedY = Math.imul(y + 1, 19349663);
+        const seedRegion = Math.imul(regionId + 1, 83492791);
+        return (seedX ^ seedY ^ seedRegion) >>> 0;
+    }
+
+    function chooseWallMaterialVariant(region, x, y)
+    {
+        const variants = region?.wallMaterialVariants?.length
+            ? region.wallMaterialVariants
+            : [region?.wallMaterial ?? "voidRockWall"];
+
+        if (variants.length === 1)
+        {
+            return variants[0];
+        }
+
+        const variationHash = hashWallVariation(x, y, region.regionId ?? 0);
+
+        if (variants.length === 2)
+        {
+            return (variationHash % 100) < 18 ? variants[1] : variants[0];
+        }
+
+        const roll = variationHash % 100;
+
+        if (roll < 72)
+        {
+            return variants[0];
+        }
+
+        if (roll < 90)
+        {
+            return variants[1];
+        }
+
+        return variants[2];
+    }
+
     // Shuffle an array in place using the Fisher-Yates algorithm, based on the provided random function
     function shuffle(array)
     {
@@ -343,9 +439,11 @@ function generateMazeMap(width, height, options = {})
     function setRegionTheme(regionId, regionKind, theme)
     {
         regionThemes.set(regionId, {
+            regionId,
             regionKind,
             themeName: theme.name,
             wallMaterial: theme.wallMaterial,
+            wallMaterialVariants: theme.wallMaterialVariants ?? getWallMaterialVariants(theme.wallMaterial),
             floorType: theme.floorType,
             detailFloorTypes: theme.detailFloorTypes
         });
@@ -1719,7 +1817,9 @@ function generateMazeMap(width, height, options = {})
                     continue;
                 }
 
-                const counts = {};
+                const regionCounts = new Map();
+                let bestRegion = null;
+                let bestCount = -1;
 
                 // Look at the adjacent floor cells and their regions to determine which wall material is most common among them, and assign that material to the current wall cell.
                 for (const neighbor of floorNeighbors)
@@ -1731,24 +1831,21 @@ function generateMazeMap(width, height, options = {})
                         continue;
                     }
 
-                    // Count how many times each wall material appears among the adjacent floor cells' regions.
-                    counts[region.wallMaterial] = (counts[region.wallMaterial] ?? 0) + 1;
-                }
+                    const nextCount = (regionCounts.get(region.regionId) ?? 0) + 1;
+                    regionCounts.set(region.regionId, nextCount);
 
-                let bestMaterial = "voidRockWall";
-                let bestCount = -1;
-
-                for (const material in counts)
-                {
-                    if (counts[material] > bestCount)
+                    if (nextCount > bestCount)
                     {
-                        bestCount = counts[material];
-                        bestMaterial = material;
+                        bestCount = nextCount;
+                        bestRegion = region;
                     }
                 }
 
-                // Assign the most common adjacent wall material to the current wall cell.
-                currentCell.wallMaterial = bestMaterial;
+                // Bias the wall toward the dominant adjacent region, then sprinkle in a small
+                // amount of family-local variation so long corridors and rooms read less uniform.
+                currentCell.wallMaterial = bestRegion
+                    ? chooseWallMaterialVariant(bestRegion, x, y)
+                    : "voidRockWall";
             }
         }
     }
