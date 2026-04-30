@@ -1092,32 +1092,39 @@ function createMazeWorldMaterialLibrary(options = {})
             {
                 const rawDisplacementScale = options.displacementScale ?? descriptor.displacementScale ?? 0.1;
                 const rawDisplacementBias = options.displacementBias ?? descriptor.displacementBias ?? 0;
+                const displacementScaleBoost = options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5;
+                const displacementBiasBoost = options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5;
 
                 // Keep real geometry displacement controlled; stronger normal maps provide
                 // the visible micro-depth while the vertex displacement gives actual relief.
                 materialParameters.displacementScale = textureDisplacementEnabled
-                    ? rawDisplacementScale * 0.85
+                    ? rawDisplacementScale * displacementScaleBoost
                     : 0;
                 materialParameters.displacementBias = textureDisplacementEnabled
-                    ? rawDisplacementBias * 0.85
+                    ? rawDisplacementBias * displacementBiasBoost
                     : 0;
             }
 
             const material = new THREE.MeshStandardMaterial(materialParameters);
             material.shadowSide = options.shadowSide ?? THREE.FrontSide;
-            material.userData.displacementScale = (options.displacementScale ?? descriptor.displacementScale ?? 0.1) * 0.85;
-            material.userData.displacementBias = (options.displacementBias ?? descriptor.displacementBias ?? 0) * 0.85;
+            material.userData.displacementScale = (options.displacementScale ?? descriptor.displacementScale ?? 0.1)
+                * (options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5);
+            material.userData.displacementBias = (options.displacementBias ?? descriptor.displacementBias ?? 0)
+                * (options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5);
             material.userData.displacementEdgeFade = options.displacementEdgeFade ?? descriptor.displacementEdgeFade ?? descriptor.displacementEdgeFadeDistance ?? 0.11;
             material.userData.displacementCornerFadePower = options.displacementCornerFadePower ?? descriptor.displacementCornerFadePower ?? 1.45;
+            material.userData.displacementContrast = options.displacementContrast ?? descriptor.displacementContrast ?? 2.6;
+            material.userData.displacementSharpness = options.displacementSharpness ?? descriptor.displacementSharpness ?? 1.9;
 
-            // Fade geometry displacement at every repeated texture edge. This prevents raised
-            // vertices from pushing through neighbouring floor/wall tiles and removes the tiny
-            // see-through cracks at wall corners. If the Three.js shader chunk changes, the
-            // replacement simply falls back to the stock displacement path instead of breaking.
+            // Fade geometry displacement only at the outer edge of each tile face. This keeps
+            // neighboring tiles from separating at corners while still letting the texture relief
+            // stay strong across the face interior.
             material.onBeforeCompile = (shader) =>
             {
                 shader.uniforms.displacementEdgeFade = { value: material.userData.displacementEdgeFade };
                 shader.uniforms.displacementCornerFadePower = { value: material.userData.displacementCornerFadePower };
+                shader.uniforms.displacementContrast = { value: material.userData.displacementContrast };
+                shader.uniforms.displacementSharpness = { value: material.userData.displacementSharpness };
 
                 const stockChunk = '#include <displacementmap_vertex>';
 
@@ -1130,14 +1137,24 @@ function createMazeWorldMaterialLibrary(options = {})
                     .replace(
                         'void main() {',
                         [
+                            'attribute vec2 tileEdgeMaskUv;',
                             'uniform float displacementEdgeFade;',
                             'uniform float displacementCornerFadePower;',
-                            'float mazeDisplacementEdgeMask(vec2 uv) {',
-                            '    vec2 repeatedUv = fract(abs(uv));',
-                            '    vec2 distanceToEdge = min(repeatedUv, 1.0 - repeatedUv);',
+                            'uniform float displacementContrast;',
+                            'uniform float displacementSharpness;',
+                            'float mazeDisplacementEdgeMask(vec2 edgeMaskUv) {',
+                            '    vec2 clampedUv = clamp(edgeMaskUv, 0.0, 1.0);',
+                            '    vec2 distanceToEdge = min(clampedUv, 1.0 - clampedUv);',
                             '    float edgeDistance = min(distanceToEdge.x, distanceToEdge.y);',
                             '    float mask = smoothstep(0.0, max(displacementEdgeFade, 0.0001), edgeDistance);',
                             '    return pow(mask, max(displacementCornerFadePower, 0.0001));',
+                            '}',
+                            'float mazeSharpenDisplacementSample(float sampleValue) {',
+                            '    float contrasted = clamp((sampleValue - 0.5) * displacementContrast + 0.5, 0.0, 1.0);',
+                            '    if (contrasted < 0.5) {',
+                            '        return 0.5 * pow(max(contrasted * 2.0, 0.0), displacementSharpness);',
+                            '    }',
+                            '    return 1.0 - 0.5 * pow(max((1.0 - contrasted) * 2.0, 0.0), displacementSharpness);',
                             '}',
                             'void main() {'
                         ].join("\n")
@@ -1146,8 +1163,9 @@ function createMazeWorldMaterialLibrary(options = {})
                         stockChunk,
                         [
                             '#ifdef USE_DISPLACEMENTMAP',
-                            '    float displacementEdgeMask = mazeDisplacementEdgeMask(vUv);',
-                            '    float displacementValue = texture2D(displacementMap, vUv).x * displacementScale + displacementBias;',
+                            '    float displacementEdgeMask = mazeDisplacementEdgeMask(tileEdgeMaskUv);',
+                            '    float displacementSample = mazeSharpenDisplacementSample(texture2D(displacementMap, vUv).x);',
+                            '    float displacementValue = displacementSample * displacementScale + displacementBias;',
                             '    transformed += normalize(objectNormal) * displacementValue * displacementEdgeMask;',
                             '#endif'
                         ].join("\n")
@@ -1184,21 +1202,28 @@ function createMazeWorldMaterialLibrary(options = {})
         const positionAttribute = geometry.getAttribute("position");
         const uvAttribute = geometry.getAttribute("uv");
         const tileSize = placement.tileSize ?? tileWorldSize;
+        const edgeMaskUv = new Float32Array(uvAttribute.count * 2);
 
         for (let index = 0; index < uvAttribute.count; index++)
         {
-            const worldX = placement.worldX + positionAttribute.getX(index);
-            const worldZ = placement.worldZ + positionAttribute.getZ(index);
+            const localX = positionAttribute.getX(index);
+            const localZ = positionAttribute.getZ(index);
+            const worldX = placement.worldX + localX;
+            const worldZ = placement.worldZ + localZ;
 
             uvAttribute.setXY(
                 index,
                 (worldX / tileSize) * descriptor.repeatX,
                 (worldZ / tileSize) * descriptor.repeatY
             );
+
+            edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+            edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
         }
 
         uvAttribute.needsUpdate = true;
         geometry.setAttribute("uv2", new THREE.BufferAttribute(uvAttribute.array.slice(), 2));
+        geometry.setAttribute("tileEdgeMaskUv", new THREE.BufferAttribute(edgeMaskUv, 2));
         return geometry;
     }
 
@@ -1213,9 +1238,13 @@ function createMazeWorldMaterialLibrary(options = {})
         const wallHeight = placement.wallHeight ?? wallWorldHeight;
         const floorY = placement.floorY ?? worldFloorY;
         const wallCenterY = placement.worldY ?? (floorY + wallHeight / 2);
+        const edgeMaskUv = new Float32Array(uvAttribute.count * 2);
 
         for (let index = 0; index < uvAttribute.count; index++)
         {
+            const localX = positionAttribute.getX(index);
+            const localY = positionAttribute.getY(index);
+            const localZ = positionAttribute.getZ(index);
             const worldX = placement.worldX + positionAttribute.getX(index);
             const worldY = wallCenterY + positionAttribute.getY(index);
             const worldZ = placement.worldZ + positionAttribute.getZ(index);
@@ -1228,16 +1257,22 @@ function createMazeWorldMaterialLibrary(options = {})
             {
                 u = (worldX / tileSize) * descriptor.repeatX;
                 v = (worldZ / tileSize) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
             }
             else if (normalX > 0.5)
             {
                 u = (worldZ / tileSize) * descriptor.repeatX;
                 v = ((worldY - floorY) / wallHeight) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localY / wallHeight) + 0.5, 0, 1);
             }
             else
             {
                 u = (worldX / tileSize) * descriptor.repeatX;
                 v = ((worldY - floorY) / wallHeight) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localY / wallHeight) + 0.5, 0, 1);
             }
 
             uvAttribute.setXY(index, u, v);
@@ -1245,6 +1280,7 @@ function createMazeWorldMaterialLibrary(options = {})
 
         uvAttribute.needsUpdate = true;
         geometry.setAttribute("uv2", new THREE.BufferAttribute(uvAttribute.array.slice(), 2));
+        geometry.setAttribute("tileEdgeMaskUv", new THREE.BufferAttribute(edgeMaskUv, 2));
         return geometry;
     }
 

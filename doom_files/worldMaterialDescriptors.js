@@ -529,8 +529,10 @@ function applyWallTextureDescriptor(descriptor, normalizedKey)
 
     Object.assign(descriptor, textureDescriptor);
 
-    descriptor.displacementEdgeFadeDistance ??= 0.11;
-    descriptor.displacementCornerFadePower ??= 1.45;
+    descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.18);
+    descriptor.displacementCornerFadePower ??= 1.8;
+    descriptor.displacementContrast ??= 2.8;
+    descriptor.displacementSharpness ??= 2.0;
 }
 
 function applyFloorTextureDescriptor(descriptor, normalizedKey)
@@ -544,8 +546,10 @@ function applyFloorTextureDescriptor(descriptor, normalizedKey)
 
     Object.assign(descriptor, textureDescriptor);
 
-    descriptor.displacementEdgeFadeDistance ??= 0.10;
-    descriptor.displacementCornerFadePower ??= 1.25;
+    descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.16);
+    descriptor.displacementCornerFadePower ??= 1.6;
+    descriptor.displacementContrast ??= 2.4;
+    descriptor.displacementSharpness ??= 1.8;
 }
 
 // Creates the recipe that describes how one surface should look and feel.
