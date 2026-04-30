@@ -5,11 +5,12 @@
 class Loop
 {
     // Stores the render objects and the list of animated updatables.
-    constructor(camera, scene, renderer)
+    constructor(camera, scene, renderer, renderPipeline = null)
     {
         this.camera = camera;
         this.scene = scene;
         this.renderer = renderer;
+        this.renderPipeline = renderPipeline;
         this.updatables = [];
         this.clock = new THREE.Clock();
     }
@@ -20,7 +21,7 @@ class Loop
         this.renderer.setAnimationLoop(() =>
         {
             this.tick();
-            this.renderer.render(this.scene, this.camera);
+            this.render();
         });
     }
 
@@ -43,5 +44,16 @@ class Loop
                 object.tick(delta);
             }
         }
+    }
+
+    render()
+    {
+        if (this.renderPipeline?.render)
+        {
+            this.renderPipeline.render();
+            return;
+        }
+
+        this.renderer.render(this.scene, this.camera);
     }
 }

@@ -9,10 +9,12 @@ function createMazeWorldMaterialLibrary(options = {})
     const tileWorldSize = options.tileSize ?? 1;
     const wallWorldHeight = options.wallHeight ?? 1;
     const worldFloorY = options.floorY ?? 0;
+    let textureDisplacementEnabled = options.textureDisplacementEnabled ?? false;
     const maxAnisotropy =
         renderer?.capabilities?.getMaxAnisotropy
             ? renderer.capabilities.getMaxAnisotropy()
             : 1;
+    const imageTextureLoader = new THREE.TextureLoader();
 
     const baseTextureCache = new Map();
     const sharedMaterialCache = new Map();
@@ -21,6 +23,7 @@ function createMazeWorldMaterialLibrary(options = {})
     const ownedGeometrySet = new Set();
     const ownedTextureSet = new Set();
     const ownedMaterialSet = new Set();
+    const textureLoadPromises = [];
 
     // Keeps generated values inside an expected range.
     function clamp(value, min, max)
@@ -932,7 +935,7 @@ function createMazeWorldMaterialLibrary(options = {})
 
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.RepeatWrapping;
-            texture.anisotropy = maxAnisotropy;
+            texture.anisotropy = Math.min(maxAnisotropy, 4);
 
             if (textureKind !== "bump")
             {
@@ -956,7 +959,7 @@ function createMazeWorldMaterialLibrary(options = {})
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(1, 1);
         texture.offset.set(0, 0);
-        texture.anisotropy = maxAnisotropy;
+        texture.anisotropy = Math.min(maxAnisotropy, 4);
 
         if (textureKind !== "bump")
         {
@@ -969,22 +972,205 @@ function createMazeWorldMaterialLibrary(options = {})
         return texture;
     }
 
+    function createConfiguredImageTexture(texturePath, textureKind)
+    {
+        let resolveTextureLoad;
+        const textureLoadPromise = new Promise((resolve) =>
+        {
+            resolveTextureLoad = resolve;
+        });
+        const texture = imageTextureLoader.load(
+            texturePath,
+            (loadedTexture) =>
+            {
+                loadedTexture.needsUpdate = true;
+                resolveTextureLoad(loadedTexture);
+            },
+            undefined,
+            () =>
+            {
+                resolveTextureLoad(null);
+            }
+        );
+
+        textureLoadPromises.push(textureLoadPromise);
+
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1);
+        texture.offset.set(0, 0);
+        texture.anisotropy = Math.min(maxAnisotropy, 4);
+
+        if (textureKind === "map" || textureKind === "emissiveMap")
+        {
+            texture.encoding = THREE.sRGBEncoding;
+        }
+
+        texture.needsUpdate = true;
+        ownedTextureSet.add(texture);
+
+        return texture;
+    }
+
+    function createMaterialTextureParameters(descriptor)
+    {
+        if (!descriptor.textureMaps)
+        {
+            return {
+                map: createConfiguredTexture(descriptor, "albedo"),
+                bumpMap: createConfiguredTexture(descriptor, "bump"),
+                bumpScale: descriptor.bumpScale
+            };
+        }
+
+        const textureParameters = {};
+
+        for (const [textureKind, texturePath] of Object.entries(descriptor.textureMaps))
+        {
+            if (textureKind === "displacementMap" && !textureDisplacementEnabled)
+            {
+                continue;
+            }
+
+            textureParameters[textureKind] = createConfiguredImageTexture(texturePath, textureKind);
+        }
+
+        return textureParameters;
+    }
+
     // Creates or reuses one shared material recipe for a whole family of surfaces.
     function getSharedMaterial(cacheKey, descriptor, options = {})
     {
         if (!sharedMaterialCache.has(cacheKey))
         {
-            const material = new THREE.MeshStandardMaterial({
-                color: options.color ?? "#ffffff",
-                map: createConfiguredTexture(descriptor, "albedo"),
-                bumpMap: createConfiguredTexture(descriptor, "bump"),
-                bumpScale: options.bumpScale ?? descriptor.bumpScale,
-                roughness: options.roughness ?? descriptor.roughness,
-                metalness: options.metalness ?? descriptor.metalness,
+            const textureParameters = createMaterialTextureParameters(descriptor);
+            const minimumRoughness =
+                descriptor.surfaceKind === "wall" || descriptor.surfaceKind === "ceiling"
+                    ? (descriptor.family === "iceCave" ? 0.22 : 0.86)
+                    : (descriptor.family === "iceCave" ? 0.26 : 0.76);
+            const maximumMetalness =
+                descriptor.surfaceKind === "wall" || descriptor.surfaceKind === "ceiling"
+                    ? (descriptor.family === "iceCave" ? 0.14 : 0.035)
+                    : (descriptor.family === "iceCave" ? 0.12 : 0.06);
+            const materialParameters = {
+                color: options.color ?? descriptor.color ?? "#ffffff",
+                ...textureParameters,
+                roughness: Math.max(options.roughness ?? descriptor.roughness, minimumRoughness),
+                metalness: Math.min(options.metalness ?? descriptor.metalness, maximumMetalness),
                 emissive: options.emissive ?? descriptor.emissive,
                 emissiveIntensity: options.emissiveIntensity ?? descriptor.emissiveIntensity,
+                envMapIntensity: options.envMapIntensity ?? descriptor.envMapIntensity ?? 0,
                 side: options.side ?? THREE.FrontSide
-            });
+            };
+
+            // Three r127's standard material does not use specularMap directly. Keep spec maps
+            // active by using them as the available gloss/roughness source when no roughness map exists.
+            if (textureParameters.specularMap && !textureParameters.roughnessMap)
+            {
+                materialParameters.roughnessMap = textureParameters.specularMap;
+            }
+
+            if (textureParameters.bumpMap)
+            {
+                materialParameters.bumpScale = options.bumpScale ?? textureParameters.bumpScale;
+            }
+
+            if (textureParameters.normalMap && descriptor.normalScale)
+            {
+                materialParameters.normalScale = new THREE.Vector2(
+                    Math.min(options.normalScale ?? descriptor.normalScale, 1.55),
+                    Math.min(options.normalScale ?? descriptor.normalScale, 1.55)
+                );
+            }
+
+            if (textureParameters.aoMap)
+            {
+                materialParameters.aoMapIntensity = options.aoMapIntensity ?? descriptor.aoMapIntensity ?? 1.15;
+            }
+
+            if (textureParameters.displacementMap)
+            {
+                const rawDisplacementScale = options.displacementScale ?? descriptor.displacementScale ?? 0.1;
+                const rawDisplacementBias = options.displacementBias ?? descriptor.displacementBias ?? 0;
+                const displacementScaleBoost = options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5;
+                const displacementBiasBoost = options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5;
+
+                // Keep real geometry displacement controlled; stronger normal maps provide
+                // the visible micro-depth while the vertex displacement gives actual relief.
+                materialParameters.displacementScale = textureDisplacementEnabled
+                    ? rawDisplacementScale * displacementScaleBoost
+                    : 0;
+                materialParameters.displacementBias = textureDisplacementEnabled
+                    ? rawDisplacementBias * displacementBiasBoost
+                    : 0;
+            }
+
+            const material = new THREE.MeshStandardMaterial(materialParameters);
+            material.shadowSide = options.shadowSide ?? THREE.FrontSide;
+            material.userData.displacementScale = (options.displacementScale ?? descriptor.displacementScale ?? 0.1)
+                * (options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.5);
+            material.userData.displacementBias = (options.displacementBias ?? descriptor.displacementBias ?? 0)
+                * (options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.5);
+            material.userData.displacementEdgeFade = options.displacementEdgeFade ?? descriptor.displacementEdgeFade ?? descriptor.displacementEdgeFadeDistance ?? 0.11;
+            material.userData.displacementCornerFadePower = options.displacementCornerFadePower ?? descriptor.displacementCornerFadePower ?? 1.45;
+            material.userData.displacementContrast = options.displacementContrast ?? descriptor.displacementContrast ?? 2.6;
+            material.userData.displacementSharpness = options.displacementSharpness ?? descriptor.displacementSharpness ?? 1.9;
+
+            // Fade geometry displacement only at the outer edge of each tile face. This keeps
+            // neighboring tiles from separating at corners while still letting the texture relief
+            // stay strong across the face interior.
+            material.onBeforeCompile = (shader) =>
+            {
+                shader.uniforms.displacementEdgeFade = { value: material.userData.displacementEdgeFade };
+                shader.uniforms.displacementCornerFadePower = { value: material.userData.displacementCornerFadePower };
+                shader.uniforms.displacementContrast = { value: material.userData.displacementContrast };
+                shader.uniforms.displacementSharpness = { value: material.userData.displacementSharpness };
+
+                const stockChunk = '#include <displacementmap_vertex>';
+
+                if (!shader.vertexShader.includes(stockChunk))
+                {
+                    return;
+                }
+
+                shader.vertexShader = shader.vertexShader
+                    .replace(
+                        'void main() {',
+                        [
+                            'attribute vec2 tileEdgeMaskUv;',
+                            'uniform float displacementEdgeFade;',
+                            'uniform float displacementCornerFadePower;',
+                            'uniform float displacementContrast;',
+                            'uniform float displacementSharpness;',
+                            'float mazeDisplacementEdgeMask(vec2 edgeMaskUv) {',
+                            '    vec2 clampedUv = clamp(edgeMaskUv, 0.0, 1.0);',
+                            '    vec2 distanceToEdge = min(clampedUv, 1.0 - clampedUv);',
+                            '    float edgeDistance = min(distanceToEdge.x, distanceToEdge.y);',
+                            '    float mask = smoothstep(0.0, max(displacementEdgeFade, 0.0001), edgeDistance);',
+                            '    return pow(mask, max(displacementCornerFadePower, 0.0001));',
+                            '}',
+                            'float mazeSharpenDisplacementSample(float sampleValue) {',
+                            '    float contrasted = clamp((sampleValue - 0.5) * displacementContrast + 0.5, 0.0, 1.0);',
+                            '    if (contrasted < 0.5) {',
+                            '        return 0.5 * pow(max(contrasted * 2.0, 0.0), displacementSharpness);',
+                            '    }',
+                            '    return 1.0 - 0.5 * pow(max((1.0 - contrasted) * 2.0, 0.0), displacementSharpness);',
+                            '}',
+                            'void main() {'
+                        ].join("\n")
+                    )
+                    .replace(
+                        stockChunk,
+                        [
+                            '#ifdef USE_DISPLACEMENTMAP',
+                            '    float displacementEdgeMask = mazeDisplacementEdgeMask(tileEdgeMaskUv);',
+                            '    float displacementSample = mazeSharpenDisplacementSample(texture2D(displacementMap, vUv).x);',
+                            '    float displacementValue = displacementSample * displacementScale + displacementBias;',
+                            '    transformed += normalize(objectNormal) * displacementValue * displacementEdgeMask;',
+                            '#endif'
+                        ].join("\n")
+                    );
+            };
 
             sharedMaterialCache.set(cacheKey, material);
             ownedMaterialSet.add(material);
@@ -1016,20 +1202,28 @@ function createMazeWorldMaterialLibrary(options = {})
         const positionAttribute = geometry.getAttribute("position");
         const uvAttribute = geometry.getAttribute("uv");
         const tileSize = placement.tileSize ?? tileWorldSize;
+        const edgeMaskUv = new Float32Array(uvAttribute.count * 2);
 
         for (let index = 0; index < uvAttribute.count; index++)
         {
-            const worldX = placement.worldX + positionAttribute.getX(index);
-            const worldZ = placement.worldZ + positionAttribute.getZ(index);
+            const localX = positionAttribute.getX(index);
+            const localZ = positionAttribute.getZ(index);
+            const worldX = placement.worldX + localX;
+            const worldZ = placement.worldZ + localZ;
 
             uvAttribute.setXY(
                 index,
                 (worldX / tileSize) * descriptor.repeatX,
                 (worldZ / tileSize) * descriptor.repeatY
             );
+
+            edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+            edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
         }
 
         uvAttribute.needsUpdate = true;
+        geometry.setAttribute("uv2", new THREE.BufferAttribute(uvAttribute.array.slice(), 2));
+        geometry.setAttribute("tileEdgeMaskUv", new THREE.BufferAttribute(edgeMaskUv, 2));
         return geometry;
     }
 
@@ -1044,9 +1238,13 @@ function createMazeWorldMaterialLibrary(options = {})
         const wallHeight = placement.wallHeight ?? wallWorldHeight;
         const floorY = placement.floorY ?? worldFloorY;
         const wallCenterY = placement.worldY ?? (floorY + wallHeight / 2);
+        const edgeMaskUv = new Float32Array(uvAttribute.count * 2);
 
         for (let index = 0; index < uvAttribute.count; index++)
         {
+            const localX = positionAttribute.getX(index);
+            const localY = positionAttribute.getY(index);
+            const localZ = positionAttribute.getZ(index);
             const worldX = placement.worldX + positionAttribute.getX(index);
             const worldY = wallCenterY + positionAttribute.getY(index);
             const worldZ = placement.worldZ + positionAttribute.getZ(index);
@@ -1059,32 +1257,41 @@ function createMazeWorldMaterialLibrary(options = {})
             {
                 u = (worldX / tileSize) * descriptor.repeatX;
                 v = (worldZ / tileSize) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
             }
             else if (normalX > 0.5)
             {
                 u = (worldZ / tileSize) * descriptor.repeatX;
                 v = ((worldY - floorY) / wallHeight) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localZ / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localY / wallHeight) + 0.5, 0, 1);
             }
             else
             {
                 u = (worldX / tileSize) * descriptor.repeatX;
                 v = ((worldY - floorY) / wallHeight) * descriptor.repeatY;
+                edgeMaskUv[(index * 2)] = THREE.MathUtils.clamp((localX / tileSize) + 0.5, 0, 1);
+                edgeMaskUv[(index * 2) + 1] = THREE.MathUtils.clamp((localY / wallHeight) + 0.5, 0, 1);
             }
 
             uvAttribute.setXY(index, u, v);
         }
 
         uvAttribute.needsUpdate = true;
+        geometry.setAttribute("uv2", new THREE.BufferAttribute(uvAttribute.array.slice(), 2));
+        geometry.setAttribute("tileEdgeMaskUv", new THREE.BufferAttribute(edgeMaskUv, 2));
         return geometry;
     }
 
-    // Ceilings follow the local theme family rather than the special floor marker on that tile.
+    // Ceilings reuse the real floor texture pack for the tile's base surface. Special pads keep
+    // their gameplay floor material, but ceilings above them still match the surrounding floor.
     function resolveCeilingKey(currentCell)
     {
         return (
-            currentCell.themeName ??
             currentCell.baseFloorType ??
             currentCell.floorType ??
+            currentCell.themeName ??
             "neutralCeiling"
         );
     }
@@ -1101,9 +1308,11 @@ function createMazeWorldMaterialLibrary(options = {})
                 new THREE.MeshStandardMaterial({
                     color: color,
                     emissive: color.clone().multiplyScalar(0.92),
-                    emissiveIntensity: 0.95,
-                    metalness: 0.32,
-                    roughness: 0.18
+                    emissiveIntensity: 2.9,
+                    metalness: 0.02,
+                    roughness: 0.78,
+                    envMapIntensity: 0,
+                    toneMapped: false
                 })
             );
         }
@@ -1190,6 +1399,32 @@ function createMazeWorldMaterialLibrary(options = {})
         },
 
         getTeleportMaterial,
+
+        whenTexturesReady()
+        {
+            return Promise.all(textureLoadPromises);
+        },
+
+        setTextureDisplacementEnabled(enabled)
+        {
+            textureDisplacementEnabled = !!enabled;
+
+            for (const material of ownedMaterialSet)
+            {
+                if (!material.displacementMap)
+                {
+                    continue;
+                }
+
+                material.displacementScale = textureDisplacementEnabled
+                    ? material.userData.displacementScale ?? 0.1
+                    : 0;
+                material.displacementBias = textureDisplacementEnabled
+                    ? material.userData.displacementBias ?? 0
+                    : 0;
+                material.needsUpdate = true;
+            }
+        },
 
         // Releases the cached materials and textures when a maze world is rebuilt.
         dispose()

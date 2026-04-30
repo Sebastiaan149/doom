@@ -697,6 +697,7 @@ function addMazeMapOverlay(container, options = {})
     const mazeHeight = options.mazeHeight ?? 15;
     const tileSize = options.tileSize ?? 8;
     const mainTheme = options.mainTheme ?? "random";
+    const textureDisplacementEnabled = options.textureDisplacementEnabled ?? false;
     const themeOptions = Array.isArray(options.availableThemes) && options.availableThemes.length > 0
         ? options.availableThemes
         : DEFAULT_MAZE_THEME_OPTIONS;
@@ -748,7 +749,22 @@ function addMazeMapOverlay(container, options = {})
     }
 
     themeControl.append(themeLabel, themeSelect);
-    titleGroup.append(title, themeControl);
+
+    const displacementControl = document.createElement("label");
+    displacementControl.className = "maze-map-displacement-control";
+
+    const displacementInput = document.createElement("input");
+    displacementInput.type = "checkbox";
+    displacementInput.className = "maze-map-displacement-input";
+    displacementInput.checked = textureDisplacementEnabled;
+    displacementInput.setAttribute("aria-label", "Texture displacement");
+
+    const displacementLabel = document.createElement("span");
+    displacementLabel.className = "maze-map-displacement-label";
+    displacementLabel.textContent = "Displacement";
+
+    displacementControl.append(displacementInput, displacementLabel);
+    titleGroup.append(title, themeControl, displacementControl);
 
     const toggleButton = document.createElement("button");
     toggleButton.type = "button";
@@ -788,6 +804,12 @@ function addMazeMapOverlay(container, options = {})
         {
             options.onThemeChange?.(nextTheme);
         }, 0);
+    });
+
+    displacementInput.addEventListener("change", (event) =>
+    {
+        event.stopPropagation();
+        options.onTextureDisplacementChange?.(event.currentTarget.checked);
     });
 
     if (options.initialExpanded)

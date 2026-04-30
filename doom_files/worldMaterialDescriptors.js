@@ -51,6 +51,507 @@ function inferSurfaceFamily(identifier = "")
     return "neutral";
 }
 
+function createWallTextureMaps(folderName, fileBaseName, options = {})
+{
+    const rootPath = `./assets/textures/wall/${folderName}/${fileBaseName}`;
+    const maps = {
+        map: `${rootPath}_${options.colorSuffix ?? "diffuse"}.${options.colorExtension ?? "jpg"}`,
+        normalMap: `${rootPath}_normal.${options.normalExtension ?? "jpg"}`,
+        aoMap: `${rootPath}_ao.${options.aoExtension ?? "jpg"}`
+    };
+
+    if (options.roughnessSuffix !== null)
+    {
+        maps.roughnessMap = `${rootPath}_${options.roughnessSuffix ?? "rough"}.${options.roughnessExtension ?? "jpg"}`;
+    }
+
+    if (options.displacementSuffix !== null)
+    {
+        maps.displacementMap = `${rootPath}_${options.displacementSuffix ?? "displacement"}.${options.displacementExtension ?? "jpg"}`;
+    }
+
+    if (options.metalnessSuffix)
+    {
+        maps.metalnessMap = `${rootPath}_${options.metalnessSuffix}.${options.metalnessExtension ?? "jpg"}`;
+    }
+
+    if (options.specularSuffix)
+    {
+        maps.specularMap = `${rootPath}_${options.specularSuffix}.${options.specularExtension ?? "jpg"}`;
+    }
+
+    return maps;
+}
+
+function createFloorTextureMaps(folderName, fileBaseName, options = {})
+{
+    const rootPath = `./assets/textures/floor/${folderName}/${fileBaseName}`;
+    const maps = {
+        map: `${rootPath}_${options.colorSuffix ?? "diffuse"}.${options.colorExtension ?? "jpg"}`,
+        normalMap: `${rootPath}_normal.${options.normalExtension ?? "jpg"}`,
+        aoMap: `${rootPath}_ao.${options.aoExtension ?? "jpg"}`
+    };
+
+    if (options.roughnessSuffix !== null)
+    {
+        maps.roughnessMap = `${rootPath}_${options.roughnessSuffix ?? "rough"}.${options.roughnessExtension ?? "jpg"}`;
+    }
+
+    if (options.displacementSuffix !== null)
+    {
+        maps.displacementMap = `${rootPath}_${options.displacementSuffix ?? "displacement"}.${options.displacementExtension ?? "jpg"}`;
+    }
+
+    if (options.metalnessSuffix)
+    {
+        maps.metalnessMap = `${rootPath}_${options.metalnessSuffix}.${options.metalnessExtension ?? "jpg"}`;
+    }
+
+    if (options.bumpSuffix)
+    {
+        maps.bumpMap = `${rootPath}_${options.bumpSuffix}.${options.bumpExtension ?? "jpg"}`;
+    }
+
+    if (options.emissiveSuffix)
+    {
+        maps.emissiveMap = `${rootPath}_${options.emissiveSuffix}.${options.emissiveExtension ?? "jpg"}`;
+    }
+
+    if (options.specularSuffix)
+    {
+        maps.specularMap = `${rootPath}_${options.specularSuffix}.${options.specularExtension ?? "jpg"}`;
+    }
+
+    return maps;
+}
+
+const WALL_TEXTURE_DESCRIPTORS = {
+    castlebrickwall: {
+        textureMaps: createWallTextureMaps("castleBrickWall", "castleBrickWall"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.85,
+        metalness: 0.03,
+        normalScale: 1.2,
+        bumpScale: 0,
+        aoMapIntensity: 1.2,
+        displacementScale: 0.065,
+        displacementBias: -0.0325,
+        displacementEdgeFadeDistance: 0.11,
+        displacementCornerFadePower: 1.5
+    },
+    castlestonewall: {
+        textureMaps: createWallTextureMaps("castleStoneWall", "castleStoneWall"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.9,
+        metalness: 0.02,
+        normalScale: 1.15,
+        bumpScale: 0,
+        aoMapIntensity: 1.25,
+        displacementScale: 0.055,
+        displacementBias: -0.0275
+    },
+    industrialdarkmetalwall: {
+        textureMaps: createWallTextureMaps("industrialDarkMetalWall", "industrialDarkMetalWall", {
+            metalnessSuffix: "metal",
+            specularSuffix: "spec"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.96,
+        metalness: 0.04,
+        normalScale: 1.1,
+        bumpScale: 0,
+        aoMapIntensity: 1.15,
+        displacementScale: 0.025,
+        displacementBias: -0.0125
+    },
+    industrialpanelwall: {
+        textureMaps: createWallTextureMaps("industrialPanelWall", "industrialPanelWall"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.94,
+        metalness: 0.04,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.15,
+        displacementScale: 0.035,
+        displacementBias: -0.0175,
+        // lower brightness
+        color: "#313334"
+    },
+    industrialconcretewall: {
+        textureMaps: createWallTextureMaps("industrialConcreteWall", "industrialConcreteWall"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.92,
+        metalness: 0.04,
+        normalScale: 1.1,
+        bumpScale: 0,
+        aoMapIntensity: 1.2,
+        displacementScale: 0.045,
+        displacementBias: -0.0225
+    },
+    foresttemplemosswall: {
+        textureMaps: createWallTextureMaps("forestTempleMossWall", "forestTempleMossWall"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.95,
+        metalness: 0.01,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.25,
+        displacementScale: 0.045,
+        displacementBias: -0.0225
+    },
+    foresttemplerootwall: {
+        textureMaps: createWallTextureMaps("forestTempleRootWall", "forestTempleRootWall", {
+            colorSuffix: "baseColor",
+            displacementSuffix: "height",
+            displacementExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.9,
+        metalness: 0.01,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.2,
+        displacementScale: 0.06,
+        displacementBias: -0.03
+    },
+    firecavebasaltwall: {
+        textureMaps: createWallTextureMaps("fireCaveBasaltWall", "fireCaveBasaltWall", {
+            colorExtension: "png",
+            normalExtension: "png",
+            aoExtension: "png",
+            roughnessSuffix: null,
+            displacementExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#3f3935",
+        // Dry basalt should read matte/rocky, not wet or glossy.
+        roughness: 0.85,
+        metalness: 0.2,
+        envMapIntensity: 0,
+        normalScale: 0.95,
+        bumpScale: 0,
+        aoMapIntensity: 1.25,
+        displacementScale: 0.048,
+        displacementBias: -0.024
+    },
+    firecaveobsidianwall: {
+        textureMaps: createWallTextureMaps("fireCaveObsidianWall", "fireCaveObsidianWall", {
+            colorSuffix: "baseColor",
+            colorExtension: "png",
+            normalExtension: "png",
+            aoExtension: "png",
+            roughnessExtension: "png",
+            displacementSuffix: "height",
+            displacementExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+
+        // more shiny
+        roughness: 0.94,
+        metalness: 0.01,
+
+        // surface detail
+        normalScale: 1.3,
+        bumpScale: 0,
+        aoMapIntensity: 0.02,
+        displacementScale: 0.035,
+        displacementBias: -0.0175,
+
+        // lighter base color to contrast with emissive lava details
+        color: "#ffffff"
+    },
+    icecaveblueicewall: {
+        textureMaps: createWallTextureMaps("iceCaveBlueIceWall", "iceCaveBlueIceWall", {
+            colorSuffix: "baseColor",
+            displacementExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#e7fbff",
+        roughness: 0.28,
+        metalness: 0.08,
+        normalScale: 1.22,
+        bumpScale: 0,
+        aoMapIntensity: 1.05,
+        displacementScale: 0.035,
+        displacementBias: -0.0175
+    },
+    icecavecrystalwall: {
+        textureMaps: createWallTextureMaps("iceCaveCrystalWall", "iceCaveCrystalWall", {
+            colorSuffix: "baseColor",
+            roughnessSuffix: null,
+            displacementExtension: "png",
+            specularSuffix: "spec"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.22,
+        metalness: 0.1,
+        normalScale: 1.18,
+        bumpScale: 0,
+        aoMapIntensity: 1.05,
+        displacementScale: 0.04,
+        displacementBias: -0.02
+    }
+};
+
+const FLOOR_TEXTURE_DESCRIPTORS = {
+    castlecrackedtile: {
+        textureMaps: createFloorTextureMaps("castleCrackedTile", "castleCrackedTile"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.88,
+        metalness: 0.02,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.22,
+        displacementScale: 0.035,
+        displacementBias: -0.0175
+    },
+    castlestonefloor: {
+        textureMaps: createFloorTextureMaps("castleStoneFloor", "castleStoneFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.9,
+        metalness: 0.02,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.2,
+        displacementScale: 0.032,
+        displacementBias: -0.016
+    },
+    castletilefloor: {
+        textureMaps: createFloorTextureMaps("castleTileFloor", "castleTileFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.84,
+        metalness: 0.03,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.18,
+        displacementScale: 0.03,
+        displacementBias: -0.015
+    },
+    industrialmetalfloor: {
+        textureMaps: createFloorTextureMaps("industrialMetalFloor", "industrialMetalFloor", {
+            metalnessSuffix: "metal"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.94,
+        metalness: 0.04,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.12,
+        displacementScale: 0.02,
+        displacementBias: -0.01
+    },
+    industrialgratefloor: {
+        textureMaps: createFloorTextureMaps("industrialGrateFloor", "industrialGrateFloor", {
+            metalnessSuffix: "metal"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#3b2d2b",
+        roughness: 0.96,
+        metalness: 0.03,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.15,
+        displacementScale: 0.025,
+        displacementBias: -0.0125
+    },
+    industrialconcretefloor: {
+        textureMaps: createFloorTextureMaps("industrialConcreteFloor", "industrialConcreteFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.92,
+        metalness: 0.04,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.2,
+        displacementScale: 0.028,
+        displacementBias: -0.014
+    },
+    industrialdarktilefloor: {
+        textureMaps: createFloorTextureMaps("industrialDarkTileFloor", "industrialDarkTileFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.94,
+        metalness: 0.04,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.16,
+        displacementScale: 0.022,
+        displacementBias: -0.011
+    },
+    foresttemplemossfloor: {
+        textureMaps: createFloorTextureMaps("forestTempleMossFloor", "forestTempleMossFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.96,
+        metalness: 0.01,
+        normalScale: 1,
+        bumpScale: 0,
+        aoMapIntensity: 1.26,
+        displacementScale: 0.035,
+        displacementBias: -0.0175
+    },
+    foresttemplerockfloor: {
+        textureMaps: createFloorTextureMaps("forestTempleRockFloor", "forestTempleRockFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.93,
+        metalness: 0.02,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.22,
+        displacementScale: 0.04,
+        displacementBias: -0.02
+    },
+    foresttemplestonefloor: {
+        textureMaps: createFloorTextureMaps("forestTempleStoneFloor", "forestTempleStoneFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.9,
+        metalness: 0.02,
+        normalScale: 1.05,
+        bumpScale: 0,
+        aoMapIntensity: 1.22,
+        displacementScale: 0.032,
+        displacementBias: -0.016
+    },
+    firecavestonefloor: {
+        textureMaps: createFloorTextureMaps("fireCaveStoneFloor", "fireCaveStoneFloor"),
+        repeatX: 1,
+        repeatY: 1,
+        roughness: 0.88,
+        metalness: 0.04,
+        normalScale: 1.15,
+        bumpScale: 0,
+        aoMapIntensity: 1.18,
+        displacementScale: 0.042,
+        displacementBias: -0.021
+    },
+    firecavescorchfloor: {
+        textureMaps: createFloorTextureMaps("fireCaveScorchFloor", "fireCaveScorchFloor", {
+            colorSuffix: "baseColor",
+            colorExtension: "png",
+            normalExtension: "png",
+            aoExtension: "png",
+            roughnessSuffix: null,
+            displacementExtension: "png",
+            specularSuffix: "spec",
+            specularExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#ffffff",
+        roughness: 0.82,
+        metalness: 0.03,
+        normalScale: 1.15,
+        bumpScale: 0,
+        aoMapIntensity: 1.16,
+        displacementScale: 0.038,
+        displacementBias: -0.019
+    },
+    firecavelavafloor: {
+        textureMaps: createFloorTextureMaps("fireCaveLavaFloor", "fireCaveLavaFloor", {
+            colorSuffix: "baseColor",
+            displacementSuffix: "height",
+            displacementExtension: "png",
+            emissiveSuffix: "emissive"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#ffffff",
+        roughness: 0.92,
+        metalness: 0,
+        normalScale: 1.1,
+        bumpScale: 0,
+        aoMapIntensity: 1,
+        displacementScale: 0.05,
+        displacementBias: -0.025,
+        emissive: "#ff6a1e",
+        emissiveIntensity: 1.05
+    },
+    icecavefrostfloor: {
+        textureMaps: createFloorTextureMaps("iceCaveFrostFloor", "iceCaveFrostFloor", {
+            colorSuffix: "baseColor",
+            displacementExtension: "png"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#f5fdff",
+        roughness: 0.3,
+        metalness: 0.06,
+        normalScale: 1.18,
+        bumpScale: 0,
+        aoMapIntensity: 1.08,
+        displacementScale: 0.025,
+        displacementBias: -0.0125
+    },
+    icecavesnowfloor: {
+        textureMaps: createFloorTextureMaps("iceCaveSnowFloor", "iceCaveSnowFloor", {
+            bumpSuffix: "bump",
+            specularSuffix: "spec"
+        }),
+        repeatX: 1,
+        repeatY: 1,
+        color: "#ffffff",
+        roughness: 0.36,
+        metalness: 0.03,
+        normalScale: 1.08,
+        bumpScale: 0.055,
+        aoMapIntensity: 1.08,
+        displacementScale: 0.024,
+        displacementBias: -0.012
+    }
+};
+
+function applyWallTextureDescriptor(descriptor, normalizedKey)
+{
+    const textureDescriptor = WALL_TEXTURE_DESCRIPTORS[normalizedKey];
+
+    if (!textureDescriptor)
+    {
+        return;
+    }
+
+    Object.assign(descriptor, textureDescriptor);
+
+    descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.18);
+    descriptor.displacementCornerFadePower ??= 1.8;
+    descriptor.displacementContrast ??= 2.8;
+    descriptor.displacementSharpness ??= 2.0;
+}
+
+function applyFloorTextureDescriptor(descriptor, normalizedKey)
+{
+    const textureDescriptor = FLOOR_TEXTURE_DESCRIPTORS[normalizedKey];
+
+    if (!textureDescriptor)
+    {
+        return;
+    }
+
+    Object.assign(descriptor, textureDescriptor);
+
+    descriptor.displacementEdgeFadeDistance = Math.max(descriptor.displacementEdgeFadeDistance ?? 0, 0.16);
+    descriptor.displacementCornerFadePower ??= 1.6;
+    descriptor.displacementContrast ??= 2.4;
+    descriptor.displacementSharpness ??= 1.8;
+}
+
 // Creates the recipe that describes how one surface should look and feel.
 function createSurfaceDescriptor(surfaceKind, key)
 {
@@ -88,7 +589,7 @@ function createSurfaceDescriptor(surfaceKind, key)
         descriptor.metalness = 0.1;
         descriptor.bumpScale = 0.08;
         descriptor.emissive = "#3fe864";
-        descriptor.emissiveIntensity = 0.35;
+        descriptor.emissiveIntensity = 0.16;
         descriptor.effects.push("runes");
         return descriptor;
     }
@@ -106,7 +607,7 @@ function createSurfaceDescriptor(surfaceKind, key)
         descriptor.metalness = 0.12;
         descriptor.bumpScale = 0.08;
         descriptor.emissive = "#ff5858";
-        descriptor.emissiveIntensity = 0.4;
+        descriptor.emissiveIntensity = 0.18;
         descriptor.effects.push("runes");
         return descriptor;
     }
@@ -124,7 +625,7 @@ function createSurfaceDescriptor(surfaceKind, key)
         descriptor.metalness = 0.22;
         descriptor.bumpScale = 0.08;
         descriptor.emissive = "#8f58ff";
-        descriptor.emissiveIntensity = 0.48;
+        descriptor.emissiveIntensity = 0.22;
         descriptor.effects.push("runes");
         return descriptor;
     }
@@ -132,38 +633,38 @@ function createSurfaceDescriptor(surfaceKind, key)
     switch (family)
     {
         case "castle":
-            descriptor.baseColor = "#837766";
-            descriptor.secondaryColor = "#a59c8d";
-            descriptor.lineColor = "#453a2f";
-            descriptor.accentColor = "#d6c07a";
-            descriptor.roughness = 0.92;
+            descriptor.baseColor = "#a69584";
+            descriptor.secondaryColor = "#c3b09b";
+            descriptor.lineColor = "#5b4a3c";
+            descriptor.accentColor = "#edd88e";
+            descriptor.roughness = 0.84;
             descriptor.metalness = 0.03;
             break;
 
         case "industrial":
-            descriptor.baseColor = "#6b7379";
-            descriptor.secondaryColor = "#b6bfc6";
-            descriptor.lineColor = "#2d3238";
-            descriptor.accentColor = "#e3d175";
-            descriptor.roughness = 0.62;
+            descriptor.baseColor = "#8a959c";
+            descriptor.secondaryColor = "#c8d1d8";
+            descriptor.lineColor = "#394048";
+            descriptor.accentColor = "#f0e18e";
+            descriptor.roughness = 0.54;
             descriptor.metalness = 0.55;
             break;
 
         case "forestTemple":
-            descriptor.baseColor = "#798463";
-            descriptor.secondaryColor = "#b3a07f";
-            descriptor.lineColor = "#364027";
-            descriptor.accentColor = "#dfe48c";
-            descriptor.roughness = 0.93;
+            descriptor.baseColor = "#96a176";
+            descriptor.secondaryColor = "#c7b38e";
+            descriptor.lineColor = "#465339";
+            descriptor.accentColor = "#eef2a6";
+            descriptor.roughness = 0.86;
             descriptor.metalness = 0.02;
             break;
 
         case "fireCave":
-            descriptor.baseColor = "#5f463d";
-            descriptor.secondaryColor = "#8f6653";
-            descriptor.lineColor = "#291914";
-            descriptor.accentColor = "#ffb165";
-            descriptor.roughness = 0.9;
+            descriptor.baseColor = "#7d5d51";
+            descriptor.secondaryColor = "#a67966";
+            descriptor.lineColor = "#39221c";
+            descriptor.accentColor = "#ffc37a";
+            descriptor.roughness = 0.82;
             descriptor.metalness = 0.04;
             break;
 
@@ -192,23 +693,18 @@ function createSurfaceDescriptor(surfaceKind, key)
 
     if (surfaceKind === "ceiling")
     {
-        descriptor.repeatX = 2.1;
-        descriptor.repeatY = 2.1;
-        descriptor.bumpScale = 0.12;
-
         switch (family)
         {
             case "castle":
                 descriptor.pattern = "stone";
-                descriptor.effects.push("cracks");
                 break;
 
             case "industrial":
                 descriptor.pattern = "panel";
-                descriptor.baseColor = "#626a70";
-                descriptor.secondaryColor = "#a2adb5";
-                descriptor.lineColor = "#23272c";
-                descriptor.roughness = 0.58;
+                descriptor.baseColor = "#7f8990";
+                descriptor.secondaryColor = "#b8c2ca";
+                descriptor.lineColor = "#31373d";
+                descriptor.roughness = 0.52;
                 descriptor.metalness = 0.62;
                 break;
 
@@ -232,6 +728,7 @@ function createSurfaceDescriptor(surfaceKind, key)
                 break;
         }
 
+        applyFloorTextureDescriptor(descriptor, normalizedKey);
         return descriptor;
     }
 
@@ -300,6 +797,34 @@ function createSurfaceDescriptor(surfaceKind, key)
             descriptor.effects.push("frost");
         }
 
+        if (false && normalizedKey === "castlebrickwall")
+        {
+            descriptor.repeatX = 1;
+            descriptor.repeatY = 1;
+
+            descriptor.roughness = 0.85;
+
+            // let displacement do the work → reduce normal a bit
+            descriptor.normalScale = 1.2;
+            descriptor.bumpScale = 0.0; // remove, it's redundant
+
+            descriptor.aoMapIntensity = 1.2;
+
+            // 👇 stronger but controlled displacement
+            descriptor.displacementScale = 0.065;
+            descriptor.displacementBias = -0.0325;
+            descriptor.displacementEdgeFadeDistance = 0.11;
+            descriptor.displacementCornerFadePower = 1.5;
+            descriptor.textureMaps = {
+                map: "./assets/textures/wall/castleBrickWall/castleBrickWall_diffuse.jpg",
+                normalMap: "./assets/textures/wall/castleBrickWall/castleBrickWall_normal.jpg",
+                roughnessMap: "./assets/textures/wall/castleBrickWall/castleBrickWall_rough.jpg",
+                aoMap: "./assets/textures/wall/castleBrickWall/castleBrickWall_ao.jpg",
+                displacementMap: "./assets/textures/wall/castleBrickWall/castleBrickWall_displacement.jpg"
+            };
+        }
+
+        applyWallTextureDescriptor(descriptor, normalizedKey);
         return descriptor;
     }
 
@@ -444,5 +969,6 @@ function createSurfaceDescriptor(surfaceKind, key)
         descriptor.bumpScale = 0.07;
     }
 
+    applyFloorTextureDescriptor(descriptor, normalizedKey);
     return descriptor;
 }

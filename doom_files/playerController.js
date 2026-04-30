@@ -66,6 +66,7 @@ class FirstPersonPlayerController
         this.collisionCandidates = [];
         this.teleportCooldown = 0;
         this.teleportIgnoredCellKey = null;
+        this.onTeleport = options.onTeleport ?? null;
 
         this.keys = {
             forward: false,
@@ -383,6 +384,7 @@ class FirstPersonPlayerController
 
         this.teleportCooldown = 0.15;
         this.teleportIgnoredCellKey = this.getMazeCellKey(targetCell.x, targetCell.y);
+        this.onTeleport?.(targetCell);
 
         return true;
     }
@@ -449,7 +451,7 @@ class FirstPersonPlayerController
         return targetBounds;
     }
 
-    // Queries the octree for wall boxes that overlap the provided player bounds.
+    // Queries the octree for static collision boxes that overlap the provided player bounds.
     queryCollisionCandidates(bounds)
     {
         if (!this.collisionOctree)
@@ -462,11 +464,10 @@ class FirstPersonPlayerController
         return this.collisionOctree.query(bounds, this.collisionCandidates);
     }
 
-    // Returns true when the provided bounds overlap any wall box returned by the octree query.
+    // Returns true when the provided bounds overlap any static box returned by the octree query.
     intersectsWall(bounds)
     {
-        // The octree narrows the search to nearby wall boxes. This is a much cheaper operation than checking every wall in the maze, especially as the maze size grows. 
-        // TODO: Will also include objects
+        // The octree narrows the search to nearby walls, ceilings, and decorative props.
         const candidates = this.queryCollisionCandidates(bounds);
 
         for (const entry of candidates)
@@ -544,7 +545,6 @@ class FirstPersonPlayerController
         {
             // Hitting something above stops upward movement; hitting something below means the
             // player landed and is grounded again.
-            // TODO: ceiling still needs to be implemented
             this.verticalVelocity = 0;
             this.isGrounded = verticalMovement < 0;
         }
