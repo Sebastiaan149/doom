@@ -689,7 +689,7 @@ function buildMazeWorldFromData(maze, options = {})
         for (let i = 0; i < runs; i++)
         {
             // Recreate the octree to measure the same work the constructor does.
-            createCollisionOctree(wallCollisionEntries);
+            createCollisionOctree(collisionEntries);
         }
         const benchEnd = now();
         octreeBuildMs = (benchEnd - benchStart) / runs;
@@ -701,7 +701,7 @@ function buildMazeWorldFromData(maze, options = {})
 
     // Log with microsecond precision to make very fast builds visible.
     const octreeBuildUs = octreeBuildMs * 1000;
-    console.info(`Octree build: ${octreeBuildMs.toFixed(6)} ms (${Math.round(octreeBuildUs)} µs, ${wallCollisionEntries.length} walls)`);
+    console.info(`Octree build: ${octreeBuildMs.toFixed(6)} ms (${Math.round(octreeBuildUs)} us, ${collisionEntries.length} entries)`);
 
     group.add(decorationLayer.group);
 

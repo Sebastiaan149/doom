@@ -507,7 +507,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
         mesh.userData.collisionType = options.collisionType ?? "decor";
         mesh.userData.collisionScale = options.collisionScale ?? 1;
         mesh.userData.collisionHeightScale = options.collisionHeightScale ?? 1;
-        mesh.userData.maxCollisionFootprint = options.maxCollisionFootprint ?? (tileSize * 0.54);
+        mesh.userData.collisionFootprintScale = options.collisionFootprintScale ?? 0.88;
+        mesh.userData.maxCollisionFootprint = options.maxCollisionFootprint ?? (tileSize * 0.46);
 
         return mesh;
     }
@@ -1750,13 +1751,16 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 box.setFromCenterAndSize(center, size);
             }
 
-            const maxCollisionFootprint = object.userData.maxCollisionFootprint ?? (tileSize * 0.54);
+            const collisionFootprintScale = object.userData.collisionFootprintScale ?? 0.88;
+            const maxCollisionFootprint = object.userData.maxCollisionFootprint ?? (tileSize * 0.46);
 
             if (Number.isFinite(maxCollisionFootprint) && maxCollisionFootprint > 0)
             {
                 const center = box.getCenter(new THREE.Vector3());
                 const size = box.getSize(new THREE.Vector3());
 
+                size.x *= collisionFootprintScale;
+                size.z *= collisionFootprintScale;
                 size.x = Math.min(size.x, maxCollisionFootprint);
                 size.z = Math.min(size.z, maxCollisionFootprint);
                 box.setFromCenterAndSize(center, size);
