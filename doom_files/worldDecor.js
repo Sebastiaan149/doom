@@ -507,6 +507,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         mesh.userData.collisionType = options.collisionType ?? "decor";
         mesh.userData.collisionScale = options.collisionScale ?? 1;
         mesh.userData.collisionHeightScale = options.collisionHeightScale ?? 1;
+        mesh.userData.maxCollisionFootprint = options.maxCollisionFootprint ?? (tileSize * 0.54);
 
         return mesh;
     }
@@ -1098,7 +1099,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 new THREE.Vector3(0, tileSize * 0.22, 0),
                 {
                     collidable: true,
-                    collisionScale: 0.62
+                    collisionScale: 0.46,
+                    maxCollisionFootprint: tileSize * 0.5
                 }
             )
         );
@@ -1120,7 +1122,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
                     new THREE.Vector3(offset[0], offset[1], offset[2]),
                     {
                         collidable: true,
-                        collisionScale: 0.58
+                        collisionScale: 0.42,
+                        maxCollisionFootprint: tileSize * 0.42
                     }
                 )
             );
@@ -1190,8 +1193,9 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 new THREE.Vector3(0, tileSize * 0.12, 0),
                 {
                     collidable: true,
-                    collisionScale: 0.48,
-                    collisionHeightScale: 0.9
+                    collisionScale: 0.4,
+                    collisionHeightScale: 0.84,
+                    maxCollisionFootprint: tileSize * 0.42
                 }
             )
         );
@@ -1338,7 +1342,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 ),
                 {
                     collidable: true,
-                    collisionScale: 0.62
+                    collisionScale: 0.42,
+                    maxCollisionFootprint: tileSize * 0.46
                 }
             );
 
@@ -1355,7 +1360,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
                     castShadow: true,
                     receiveShadow: false,
                     collidable: true,
-                    collisionScale: 0.48
+                    collisionScale: 0.34,
+                    maxCollisionFootprint: tileSize * 0.34
                 }
             )
         );
@@ -1376,7 +1382,8 @@ function createMazeWorldDecorations(maze, layout, options = {})
                     castShadow: true,
                     receiveShadow: false,
                     collidable: true,
-                    collisionScale: 0.42
+                    collisionScale: 0.26,
+                    maxCollisionFootprint: tileSize * 0.24
                 }
             );
 
@@ -1740,6 +1747,18 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 size.z *= collisionScale;
                 size.y *= collisionHeightScale;
                 center.y = box.min.y + size.y / 2;
+                box.setFromCenterAndSize(center, size);
+            }
+
+            const maxCollisionFootprint = object.userData.maxCollisionFootprint ?? (tileSize * 0.54);
+
+            if (Number.isFinite(maxCollisionFootprint) && maxCollisionFootprint > 0)
+            {
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                size.x = Math.min(size.x, maxCollisionFootprint);
+                size.z = Math.min(size.z, maxCollisionFootprint);
                 box.setFromCenterAndSize(center, size);
             }
 

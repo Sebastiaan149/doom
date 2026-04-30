@@ -44,8 +44,8 @@ function buildMazeWorldFromData(maze, options = {})
 
     // Displacement needs enough vertices to follow the real height texture. Too few segments
     // create large, soft bumps instead of tile/brick-level depth.
-    const geometrySegments = textureDisplacementEnabled ? 50 : 1;
-    const wallHeightSegments = textureDisplacementEnabled ? 50 : 1;
+    const geometrySegments = textureDisplacementEnabled ? 32 : 1;
+    const wallHeightSegments = textureDisplacementEnabled ? 18 : 1;
     const floorGeometry = new THREE.PlaneGeometry(
         tileSize,
         tileSize,

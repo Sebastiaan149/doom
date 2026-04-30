@@ -181,6 +181,8 @@ class World
         this.collisionOctree = null;
         this.maze = null;
         this.textureDisplacementEnabled = false;
+        this.pendingWarmupHandle = null;
+        this.pendingWarmupTimeoutId = null;
 
         this.buildMazeForTheme(this.currentTheme);
 
@@ -276,21 +278,79 @@ class World
         this.registerUpdatable(this.themeLights);
     }
 
+    clearWarmRenderPrograms()
+    {
+        if (typeof window === "undefined")
+        {
+            return;
+        }
+
+        if (this.pendingWarmupHandle && window.cancelIdleCallback)
+        {
+            window.cancelIdleCallback(this.pendingWarmupHandle);
+        }
+
+        if (this.pendingWarmupTimeoutId)
+        {
+            window.clearTimeout(this.pendingWarmupTimeoutId);
+        }
+
+        this.pendingWarmupHandle = null;
+        this.pendingWarmupTimeoutId = null;
+    }
+
     warmRenderPrograms()
     {
-        try
+        this.clearWarmRenderPrograms();
+
+        const runWarmup = async () =>
         {
-            this.renderer.compile(this.scene, this.camera);
-        }
-        catch (error)
+            this.pendingWarmupHandle = null;
+            this.pendingWarmupTimeoutId = null;
+
+            try
+            {
+                if (typeof this.renderer.compileAsync === "function")
+                {
+                    await this.renderer.compileAsync(this.scene, this.camera);
+                }
+                else
+                {
+                    this.renderer.compile(this.scene, this.camera);
+                }
+            }
+            catch (error)
+            {
+                console.warn("Renderer shader warmup failed.", error);
+            }
+        };
+
+        if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function")
         {
-            console.warn("Renderer shader warmup failed.", error);
+            this.pendingWarmupHandle = window.requestIdleCallback(() =>
+            {
+                runWarmup();
+            }, { timeout: 180 });
+            return;
         }
+
+        if (typeof window !== "undefined")
+        {
+            this.pendingWarmupTimeoutId = window.setTimeout(() =>
+            {
+                runWarmup();
+            }, 34);
+            return;
+        }
+
+        runWarmup();
     }
 
     // Removes the old maze/minimap instance so a new theme can be generated cleanly.
     teardownMazeSystems()
     {
+        this.clearWarmRenderPrograms();
+
         if (this.minimap)
         {
             this.unregisterUpdatable(this.minimap);
@@ -509,6 +569,8 @@ class World
         {
             return;
         }
+
+        this.clearWarmRenderPrograms();
 
         const previousMazeWorld = this.mazeWorld;
         const previousMazeGroup = this.mazeGroup;
