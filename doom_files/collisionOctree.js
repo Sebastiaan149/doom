@@ -26,7 +26,7 @@ class CollisionOctreeNode
         const max = this.bounds.max;
         const center = this.bounds.getCenter(new THREE.Vector3());
 
-        // Guard against degenerate subdivision when bounds have zero/near-zero size.
+        // Guard against degenerate subdivision (= infinite recursion) when bounds have zero/near-zero size.
         const size = this.bounds.getSize(new THREE.Vector3());
         if (size.x <= OCTREE_EPS || size.y <= OCTREE_EPS || size.z <= OCTREE_EPS)
         {
@@ -36,6 +36,7 @@ class CollisionOctreeNode
         this.children = [];
         this.subdivideCount++;
 
+        // Here we loop over every combination of x/y/z child index (0 or 1) to calculate the min and max bounds for each child node.
         for (let xIndex = 0; xIndex < 2; xIndex++)
         {
             for (let yIndex = 0; yIndex < 2; yIndex++)
@@ -73,8 +74,7 @@ class CollisionOctreeNode
     // Returns the child node that can fully contain a collision box, or null if it does not fit completely inside any child.
     getContainingChild(entryBox)
     {
-        // Entries are only pushed deeper when one child fully contains them. If a box touches the
-        // split plane, it stays in the current node so queries cannot accidentally miss it.
+        // Entries are only pushed deeper when one child fully contains them. If a box touches the split plane, it stays in the current node so queries cannot accidentally miss it.
         if (!this.children)
         {
             return null;
@@ -197,6 +197,7 @@ class CollisionOctree
     {
         // Measure build time using a high-resolution timer when available so reported
         // values are precise. Also record the number of entries for diagnostics.
+        // This is used to evaluate the octree build performance
         const now = typeof performance !== "undefined" && performance.now
             ? performance.now.bind(performance)
             : Date.now;
@@ -231,7 +232,7 @@ class CollisionOctree
         this.buildTimeMs = buildEnd - buildStart;
         this.entryCount = entries.length;
 
-        // Collect diagnostics about the built tree so callers can inspect whether
+        // Collect diagnostics about the built tree so you can inspect whether
         // subdivision actually occurred and how deep the tree grew.
         const stats = {
             totalNodes: 0,
@@ -243,7 +244,7 @@ class CollisionOctree
             totalInserts: 0
         };
 
-        // Walks the finished tree once so diagnostics can report its final shape.
+        // This recursively visits every node in the tree and collects stats about how many nodes and items there are, how deep the tree grew, and how many times subdivision and insertion occurred.
         function collect(node)
         {
             stats.totalNodes++;
@@ -277,7 +278,8 @@ class CollisionOctree
     // Returns every collision entry that overlaps the provided query box.
     query(queryBox, results = [])
     {
-        // Reusing the same result array avoids a lot of unnecessary allocations during player movement.
+        // Reusing the same result array avoids a lots of unnecessary allocations during player movement.
+        // Was a small optimization that prevented stuttering when walking around the map
         results.length = 0;
 
         if (!this.root)

@@ -1,5 +1,4 @@
-// This file contains the descriptive "style recipes" used by the material system.
-// It keeps theme decisions separate from texture painting and material instancing.
+// This file contains the "styles" used by the material system.
 
 // Maps a wall/floor/theme identifier back to its broader theme family.
 function inferSurfaceFamily(identifier = "")
@@ -51,7 +50,7 @@ function inferSurfaceFamily(identifier = "")
     return "neutral";
 }
 
-// Builds a conventional texture-path bundle for one wall material set.
+// Builds the full set of texture maps for one wall material based on a naming scheme.
 function createWallTextureMaps(folderName, fileBaseName, options = {})
 {
     const rootPath = `./assets/textures/wall/${folderName}/${fileBaseName}`;
@@ -84,7 +83,7 @@ function createWallTextureMaps(folderName, fileBaseName, options = {})
     return maps;
 }
 
-// Builds a conventional texture-path bundle for one floor or ceiling material set.
+// Builds the full set of texture maps for one floor or ceiling material based on a naming scheme.
 function createFloorTextureMaps(folderName, fileBaseName, options = {})
 {
     const rootPath = `./assets/textures/floor/${folderName}/${fileBaseName}`;
@@ -127,6 +126,7 @@ function createFloorTextureMaps(folderName, fileBaseName, options = {})
     return maps;
 }
 
+// Texture wall settings for each texture
 const WALL_TEXTURE_DESCRIPTORS = {
     castlebrickwall: {
         textureMaps: createWallTextureMaps("castleBrickWall", "castleBrickWall"),
@@ -234,7 +234,6 @@ const WALL_TEXTURE_DESCRIPTORS = {
         repeatX: 1,
         repeatY: 1,
         color: "#3f3935",
-        // Dry basalt should read matte/rocky, not wet or glossy.
         roughness: 0.85,
         metalness: 0.2,
         envMapIntensity: 0,
@@ -524,7 +523,7 @@ const FLOOR_TEXTURE_DESCRIPTORS = {
     }
 };
 
-// Applies wall-specific texture metadata and the default displacement tuning used by the shader.
+// Applies wall-specific texture metadata and defaults for displacement-based effects.
 function applyWallTextureDescriptor(descriptor, normalizedKey)
 {
     const textureDescriptor = WALL_TEXTURE_DESCRIPTORS[normalizedKey];
@@ -812,13 +811,11 @@ function createSurfaceDescriptor(surfaceKind, key)
 
             descriptor.roughness = 0.85;
 
-            // let displacement do the work → reduce normal a bit
             descriptor.normalScale = 1.2;
-            descriptor.bumpScale = 0.0; // remove, it's redundant
+            descriptor.bumpScale = 0.0; // remove, redundant
 
             descriptor.aoMapIntensity = 1.2;
 
-            // 👇 stronger but controlled displacement
             descriptor.displacementScale = 0.065;
             descriptor.displacementBias = -0.0325;
             descriptor.displacementEdgeFadeDistance = 0.11;

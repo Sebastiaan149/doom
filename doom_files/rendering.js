@@ -19,7 +19,8 @@ function createCamera(options = {})
     return camera;
 }
 
-// Theme presets define the shared sky rig that still feeds the maze's indoor lighting.
+// Theme presets define the shared sky rig that still flows into the maze's indoor lighting subtly.
+// Certain maps sometimes felt too dark or too bright with the same sky rig.
 const THEME_LIGHT_PRESETS = {
     castle: {
         skyTop: 0x080f1c,
@@ -118,6 +119,7 @@ function createLights(theme = "random", environment = null)
         ...(environment ?? {})
     };
 
+    // General settings for the sky rig:
     const hemi = new THREE.HemisphereLight(preset.hemiSky, preset.hemiGround, preset.hemiIntensity);
     const ambient = new THREE.AmbientLight(0xffffff, preset.ambientIntensity);
     const sun = new THREE.DirectionalLight(preset.sunColor, preset.sunIntensity);
@@ -135,6 +137,7 @@ function createLights(theme = "random", environment = null)
         })
     );
 
+    // Although the current implementation does not use actual shadows from the sun (ceilings and walls are mostly lit by the hemisphere light), we left this in if we would later want to remove the ceilings and add general shadowing from the sun.
     sun.name = "globalShadowLight";
     sun.position.copy(preset.position);
     sun.target = sunTarget;
@@ -185,8 +188,8 @@ function createLights(theme = "random", environment = null)
     return group;
 }
 
-// Gives the player a reliable local fill light so maze corridors stay readable even when the
-// generated room lights are sparse or hidden around corners.
+// Gives the player a reliable local fill light.
+// Even if it's dark, the user can still rely on this small light
 function attachCameraLight(camera)
 {
     const fillLight = new THREE.PointLight(0xfff3df, 2.65, 34, 1.35);
@@ -252,7 +255,7 @@ function createRenderer()
     return renderer;
 }
 
-// The SSAO pass was removed because it introduced rendering bugs and unnecessary darkness.
+// We initially researched this to create some "shadow depths" in the scene, but was too buggy and expensive to be worth it. We left it in for a possible later extension where we could add some dynamic shadowing from the emissive spheres in the sky rig.
 function createScreenSpaceAmbientOcclusionRenderer(renderer, scene, camera)
 {
     return {
@@ -282,7 +285,7 @@ const setRenderSize = (container, camera, renderer, renderPipeline = null) =>
 {
     setSize(container, camera, renderer);
 
-    // Post-process passes operate on the final pixel dimensions of the renderer output.
+    // If the render pipeline has a setSize function, we call it to allow the pipeline to resize any internal buffers it uses. This is important for any possible post-processing effects that rely on render targets, as those need to be the same size as the main renderer to avoid blurriness or other artifacts.
     if (renderPipeline?.setSize)
     {
         renderPipeline.setSize(

@@ -11,16 +11,16 @@
 const MAZE_SETTINGS = {
     mazeWidth: 25,
     mazeHeight: 15,
-    tileSize: 8,
+    tileSize: 8,  // minimap pixels per maze tile
     mainTheme: "castle"
 };
 
 // These settings control how the generated maze is converted into 3D world geometry.
 const MAZE_WORLD_SETTINGS = {
-    tileSize: 8,
+    tileSize: 9,
     wallHeight: 6,
     floorY: -3,
-    ceilingThickness: 1.05
+    ceilingThickness: 1.00
 };
 
 // The available maze themes are exposed in the UI so the world can be regenerated on demand.
@@ -33,6 +33,10 @@ const MAZE_THEME_OPTIONS = [
     { value: "random", label: "Random Mix" }
 ];
 
+// This is a leftover of previous configurations of the map where we decided if there
+// would have been a ceiling or not.
+// We left this in so if you would choose later down the line to remove the ceilings,
+// you can still reuse these settings
 const MAZE_THEME_LIGHTING = {
     castle: {
         skyTop: 0x09101f,
@@ -114,6 +118,8 @@ const MAZE_THEME_LIGHTING = {
     }
 };
 
+// Again same with this: leftover of previous build
+// This changes the surrounding atmosphere of the sky
 const MAZE_THEME_ATMOSPHERE = {
     castle: {
         color: "#121b2c",
@@ -161,7 +167,7 @@ class World
         this.themeLights = createLights(this.currentTheme, MAZE_THEME_LIGHTING[this.currentTheme]);
         this.scene.add(this.camera);
         this.scene.add(this.themeLights);
-        attachCameraLight(this.camera);
+        attachCameraLight(this.camera);  // Small light that follows the player to keep them visible in dark areas.
         addControlsHint(this.container);
         this.renderPipeline = createScreenSpaceAmbientOcclusionRenderer(
             this.renderer,
@@ -171,7 +177,7 @@ class World
 
         this.loop = new Loop(this.camera, this.scene, this.renderer, this.renderPipeline);
         this.themeLights.trackCamera?.(this.camera);
-        this.registerUpdatable(this.themeLights);
+        this.registerUpdatable(this.themeLights); // Dynamic lights need to be ticked to update their position/rotation
         this.container.append(this.renderer.domElement);
         this.controls = null;
         this.minimap = null;
@@ -184,8 +190,10 @@ class World
         this.pendingWarmupHandle = null;
         this.pendingWarmupTimeoutId = null;
 
+        // Builds the initial maze
         this.buildMazeForTheme(this.currentTheme);
 
+        // Handles window resizes
         this.resizer = new Resizer(this.container, this.camera, this.renderer, this.renderPipeline);
     }
 
@@ -244,6 +252,7 @@ class World
     }
 
     // Centralizes the world-builder options so every rebuild path uses the same settings.
+    // This is for convenience when a maze needs to be rebuilt from the same data (like toggling displacement)
     getMazeWorldBuildOptions(overrides = {})
     {
         return {
@@ -277,7 +286,8 @@ class World
         });
     }
 
-    // Rebinds the teleport callback so visibility refresh follows the active maze instance.
+    // This ensures that whenever the player teleports, the maze world will immediately update its visibility if it has that feature so the player doesn't see pop-in of items that should be hidden from the new position.
+    // This solved the pop-in of items when teleporting around the map.
     bindMazeWorldTeleportRefresh()
     {
         if (this.controls)
@@ -296,12 +306,14 @@ class World
         this.scene.fog = new THREE.Fog(color, atmosphere.near, atmosphere.far);
     }
 
+    // Resets the scene background and fog to a default neutral sky.
     clearThemeAtmosphere()
     {
         this.scene.background = new THREE.Color("#d9f0fb");
         this.scene.fog = new THREE.Fog("#d9f0fb", 160, 500);
     }
 
+    // Applies the current theme's atmosphere settings to the scene so the sky color and fog match the active theme.
     syncRenderAtmosphere()
     {
         this.applyThemeAtmosphere(this.currentTheme);
@@ -324,6 +336,7 @@ class World
     }
 
     // Cancels any scheduled shader warmup before a new rebuild replaces the world.
+    // This prevents unnecessary CPU work from compiling shaders that will immediately get discarded when the world is torn down for a new maze/theme. => Optimizes initial load
     clearWarmRenderPrograms()
     {
         if (typeof window === "undefined")
@@ -466,7 +479,7 @@ class World
         }
     }
 
-    // Releases a not-yet-committed theme bundle when a rebuild fails mid-flight.
+    // Disposes the maze/minimap instances from a previous theme after a new one is ready so the transition is as seamless as possible.
     disposeThemeSystems(themeSystems)
     {
         if (!themeSystems)
@@ -589,6 +602,7 @@ class World
         }
     }
 
+    // Rebuilds the maze geometry and collision from the same maze data when toggling displacement.
     rebuildMazeRenderingForCurrentMaze()
     {
         if (!this.maze)
@@ -645,7 +659,7 @@ class World
         this.renderNow();
     }
 
-    // Renders one immediate frame outside the normal animation-loop cadence.
+    // Renders one immediate frame 
     renderNow()
     {
         this.loop.render();

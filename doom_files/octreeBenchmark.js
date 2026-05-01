@@ -1,6 +1,4 @@
 // Lightweight octree build benchmark helper.
-// Usage (in browser console):
-//   await window.benchmarkOctreeSizes();
 (function()
 {
     // Uses the most precise timer available in the current browser.
@@ -153,5 +151,21 @@
     // Also provide a short alias that uses the default benchmark settings.
     window.benchOctree = benchmarkOctreeSizes;
 
-    console.info("Octree benchmark helper installed: call `await benchmarkOctreeSizes()`");
+    // Convenience wrapper that can be awaited directly from the browser console.
+    window.runOctreeBench = async (options) =>
+    {
+        try
+        {
+            const results = await benchmarkOctreeSizes(options);
+            console.table(results);
+            return results;
+        }
+        catch (err)
+        {
+            console.error(err);
+            throw err;
+        }
+    };
+
+    console.info("Octree benchmark helper usable: call `await benchmarkOctreeSizes()` or `await runOctreeBench()`");
 })();

@@ -2,6 +2,8 @@
 // It lets the maze use proper textured surfaces even before external image assets are added.
 
 // Creates the shared material library used by the world builder.
+// This was used as some static example before we added the actual textures.
+// The starting and endpoint materials still remain used
 function createMazeWorldMaterialLibrary(options = {})
 {
     const renderer = options.renderer ?? null;
@@ -61,7 +63,7 @@ function createMazeWorldMaterialLibrary(options = {})
         };
     }
 
-    // Applies small HSL shifts so procedural textures can derive highlight and shadow tones.
+    // Shifts a color's lightness and saturation by a given offset, used for texture noise and effects to keep them in the same color family.
     function shiftColor(hexColor, lightnessOffset = 0, saturationOffset = 0)
     {
         const color = new THREE.Color(hexColor);
@@ -145,7 +147,7 @@ function createMazeWorldMaterialLibrary(options = {})
         ctx.stroke();
     }
 
-    // Brick walls use offset rows so the castle areas read as masonry from a distance.
+    // Brick patterns use a regular offset grid to create a classic masonry look for castle walls and similar surfaces.
     function drawBrickPattern(ctx, random, descriptor, grayscale)
     {
         const brickHeight = textureSize / 4;
@@ -421,7 +423,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Special pads use concentric circles and axis lines so they feel intentional and readable.
+    // Special pads use circles and axis lines so they feel distinct from regular floor tiles.
     function drawPadPattern(ctx, random, descriptor, grayscale)
     {
         const center = textureSize / 2;
@@ -548,7 +550,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Thin vine trails provide a lighter organic accent than roots.
+    // Thin vine trails provide a light overlay for outdoor stone surfaces and make them feel more alive.
     function drawVineEffect(ctx, random, descriptor, grayscale)
     {
         for (let index = 0; index < 7; index++)
@@ -664,7 +666,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Patch overlays help industrial floors feel repaired and reused.
+    // Patch overlays add irregular rectangles that can read as worn areas, stains, or surface variations depending on the color and pattern of the base texture.
     function drawPatchEffect(ctx, random, descriptor, grayscale)
     {
         for (let index = 0; index < 4; index++)
@@ -690,7 +692,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Glowing cracks communicate hot surfaces in the fire-cave theme.
+    // Glowing cracks and fissures for lava floors
     function drawLavaEffect(ctx, random, descriptor, grayscale)
     {
         for (let index = 0; index < 4; index++)
@@ -708,7 +710,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Ember speckles give fire-cave floors a faint live glow.
+    // Ember speckles give fire-cave floors a faint glow.
     function drawEmberEffect(ctx, random, descriptor, grayscale)
     {
         for (let index = 0; index < 28; index++)
@@ -746,7 +748,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Snow adds soft bright speckling to packed-snow floors.
+    // Snow adds soft bright speckles 
     function drawSnowEffect(ctx, random, descriptor, grayscale)
     {
         for (let index = 0; index < 80; index++)
@@ -782,7 +784,7 @@ function createMazeWorldMaterialLibrary(options = {})
         }
     }
 
-    // Banner accents give some castle floors a ceremonial visual cue.
+    // Banner accents for castle walls and similar surfaces
     function drawBannerEffect(ctx, random, descriptor, grayscale)
     {
         const stripeWidth = textureSize * 0.18;
@@ -1038,7 +1040,7 @@ function createMazeWorldMaterialLibrary(options = {})
         return textureParameters;
     }
 
-    // Creates or reuses one shared material recipe for a whole family of surfaces.
+    // Creates or reuses one shared material variant per descriptor. This is the material that should be assigned to meshes, while the texture parameters can be overridden by mesh UVs and material properties as needed.
     function getSharedMaterial(cacheKey, descriptor, options = {})
     {
         if (!sharedMaterialCache.has(cacheKey))
@@ -1067,8 +1069,6 @@ function createMazeWorldMaterialLibrary(options = {})
                 side: options.side ?? THREE.FrontSide
             };
 
-            // Three r127's standard material does not use specularMap directly. Keep spec maps
-            // active by using them as the available gloss/roughness source when no roughness map exists.
             if (specularMap && !textureParameters.roughnessMap)
             {
                 materialParameters.roughnessMap = specularMap;
@@ -1099,8 +1099,6 @@ function createMazeWorldMaterialLibrary(options = {})
                 const displacementScaleBoost = options.displacementScaleBoost ?? descriptor.displacementScaleBoost ?? 2.9;
                 const displacementBiasBoost = options.displacementBiasBoost ?? descriptor.displacementBiasBoost ?? 1.65;
 
-                // Keep real geometry displacement controlled; stronger normal maps provide
-                // the visible micro-depth while the vertex displacement gives actual relief.
                 materialParameters.displacementScale = textureDisplacementEnabled
                     ? rawDisplacementScale * displacementScaleBoost
                     : 0;
@@ -1137,6 +1135,7 @@ function createMazeWorldMaterialLibrary(options = {})
                     return;
                 }
 
+                // Injects a function to calculate a fade mask based on distance to the edge of the tile, then applies that mask to the displacement effect in the vertex shader. Was found on a couple of forums to be a common approach for fixing displacement seams.
                 shader.vertexShader = shader.vertexShader
                     .replace(
                         'void main() {',

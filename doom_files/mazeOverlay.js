@@ -761,7 +761,7 @@ function addMazeMapOverlay(container, options = {})
 
     const displacementLabel = document.createElement("span");
     displacementLabel.className = "maze-map-displacement-label";
-    displacementLabel.textContent = "Displacement";
+    displacementLabel.textContent = "Displacement (warning: may reduce performance)";
 
     displacementControl.append(displacementInput, displacementLabel);
     titleGroup.append(title, themeControl, displacementControl);

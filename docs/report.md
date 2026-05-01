@@ -1,122 +1,110 @@
 # Doom Maze Prototype - Project Report
 
-**Authors:** Louis De Gruyter, Sebastiaan Delodder
-**Date:** 2026-04-28  
-**Course:** Computer Graphics 
+**Authors:** Louis De Gruyter, Sebastiaan Delodder  
+**Date:** 2026-04-30  
+**Course:** Computer Graphics
 
 ## Project summary
-This project is a small first-person maze experience built with Three.js. It combines procedural maze generation, a 3D world built from the same maze data, a minimap with shortest-path guidance, and collision-aware movement. The focus of the work was on implementing and understanding core computer graphics and game-logic techniques rather than on asset production.
+This project is a small first-person maze experience built with Three.js. It combines procedural maze generation, a 3D world built from the same maze data, a minimap with shortest-path guidance, and collision-aware movement. The focus of our work was on implementing and understanding some core computer graphics and game-logic techniques.
 
-## System overview (high level)
-The runtime flow is: generate one logical maze -> derive a minimap and 3D geometry from it -> build a collision octree from wall tiles -> start a first-person controller and per-frame loop. All gameplay systems share the same maze data, which keeps the minimap, rendering, and collision consistent.
+The general runtime flow used is: generate one logical maze -> derive a minimap and 3D geometry from it -> build a collision octree from wall and object collision boxes -> start a first-person controller and per-frame loop. All gameplay systems share the same maze data, which keeps the minimap, rendering, and collision consistent.
+
+If you have both a dedicated and integrated GPU, it is recommended to run the project on the dedicated GPU for better performance, especially when displacement mapping is enabled (the initial load can be quite expensive). To do this on Windows, you can you to your settings -> Display -> Graphics settings, and add the browser executable (e.g. Chrome or Edge) to use the high-performance GPU.
 
 ## Team contributions
-- **Louis De Gruyter**: Collision octree implementation, Pathfinding, Player movement and controls, Minimap route overlay
-- **Sebastiaan Delodder**: Maze generation, Minimap
-[Tasks owned, e.g., 3D world building, materials, lighting, collision]
-- **Joint work**: 3D world building, Textures, Reflections, Lighting, Performance optimizations
+- **Louis De Gruyter**: Collision octree implementation, pathfinding, player movement and controls, minimap route overlay.
+- **Sebastiaan Delodder**: Maze generation, minimap generation, theme data, and 3D world generation support.
+- **Joint work**: 3D world building, textures, reflections, lighting, displacement mapping, collision tuning, performance optimizations, and report writing.
 
-## Random maze generation
-The maze is generated as a grid of cells that starts fully walled. The generator then applies several passes so the output looks like a mix of rooms and corridors instead of a pure corridor labyrinth.
+## 1. Creating the maze and 3D world
+The first task was to create a random maze floor plan. Based on this grid, a 3D maze is generated with geometric primitives (cubes, tiles) and populated with corridors, rooms, teleports, objects, and light sources. Objects and lights are theme-specific so different sections of the maze are visually distinct. Texture maps are applied to floors, walls, and ceilings, with normal/bump mapping being used and optional displacement mapping used for stronger surface depth on textures.
 
-Key choices and reasoning:
-- **Odd-sized grid and carved corridors**: The grid is forced to odd dimensions so corridor carving can jump by two cells and leave a one-cell wall between lanes. This gives clean maze structure and avoids thin walls.
-- **Room-first pass**: The generator attempts to place small rooms first, then larger rooms. This guarantees some open areas before the corridor carve begins.
-- **Randomized depth-first carving**: Corridors are carved with a stack-based randomized depth-first search, giving a classic maze feel while still allowing themed floor runs.
-- **Region IDs + connector walls**: Rooms and corridor trees are tagged with region IDs. A later pass opens walls between regions to create loops and prevent isolated islands.
-- **Dead-end softening**: Some dead ends are extended or expanded into small rooms to reduce frustration and add variation.
-- **Teleport placement**: Teleport pads are placed as paired links using a scoring function (open area preference, distance from start/goal, distance between pads, and cross-region bonus). If a disconnected component remains, one teleport pair is added to link it back to the reachable area.
-- **Wall materials after layout**: Wall materials are assigned only after floor themes are known, so walls inherit the dominant adjacent floor theme.
+The maze is generated as a grid of cells that starts fully walled. The generator then applies several passes so the output looks like a mix of rooms and corridors instead of a pure corridor labyrinth. It places rooms of certain sizes, carves corridors, opens connector walls between regions, softens some dead ends by placing small rooms, and marks start, goal, and teleport cells. The carving happens with a depth-first search, which gives a more classic maze structure with long corridors and few loops. Some dead ends are extended or expanded into small rooms to reduce frustration and add variation. Teleport pads are placed as paired links using a scoring method (open area preference, distance from start/goal, distance between pads, ...). If a disconnected room remains, one teleport pair is added to link it back to the reachable area. Wall materials are assigned after this layout is known, so walls can be themed based on their region.
+
+The 3D world is built directly from the generated maze grid. Walkable cells become floor and ceiling tiles, wall cells become box-shaped wall primitives, teleport cells get glowing markers, and selected regions receive decoration clusters (pile of rocks, ...).
 
 What we learned:
-- A single DFS carve is fast but produces monotonous mazes. Adding room and connector passes creates a more readable space without sacrificing randomness.
-- Teleports are useful both as a gameplay mechanic and as a safety net to guarantee connectivity.
+- A single DFS carve is fast but produces monotonous mazes in its simple form. Adding room and connector passes creates a more traversable and visually interesting layout without losing randomness.
+- We had to look for multiple alternative maze generation combinations so that our maze would not look like a pure corridor maze. The final result is a mix of rooms and corridors, which is more fun to explore and gives more variety in the 3D world.
 
-## Shortest path finding
-The minimap route uses breadth-first search (BFS) over the maze grid. Each floor cell is a node; edges connect the four cardinal neighbors. Teleport pads are modeled as additional edges so the path can include teleport hops when they shorten the route.
+### Theme examples
+![Castle Theme](./castle.png)
+![Industrial Theme](./industrial.png)
+![Old Forest Temple Theme](./forestTemple.png)
+![Fire Cave Theme](./fireCave.png)
+![Frost Cave Theme](./frostCave.png)
+![Random Mixed Theme](./randomMix.png)
 
-Why BFS:
-- All walk steps have uniform cost, so BFS returns the true shortest path in number of steps.
-- The maze sizes are small enough that BFS is very fast and simpler than A* or Dijkstra.
 
-Runtime behavior:
-- The path is recomputed when the player enters a new cell or clicks a new destination.
-- The drawn route is simplified for open areas with line-of-sight checks so the overlay looks clean.
+## 2. Shortest path finding and minimap
+The minimap route uses breadth-first search over the maze grid. Each floor cell is a node, and edges connect the four orthogonal neighbours that are not blocked by walls. Teleport pads are modeled as normal edges, so the path can include teleport hops if they are faster than walking. The pathfinding returns a list of cell coordinates that the player can follow to reach the destination. The minimap draws this route as a line overlay on top of the maze layout.
 
-## 3D world organization (geometric primitives)
-The 3D world is built directly from the maze grid. Each cell becomes a small set of geometric primitives:
+BFS was chosen because all walk steps have a uniform cost, so it returns the true shortest path in number of steps. The maze is also small enough that BFS is very fast, and it is simpler to implement than A* or Dijkstra for this use case. The path is recomputed when the player enters a new cell or clicks a new destination. The drawn route on the minimap is a simple line and is simplified for open areas so it offers a more "straight" path that is easier to follow visually, rather than a line that zigzags through every cell.
 
-- **Floor and ceiling tiles**: Plane primitives per walkable cell.
-- **Walls**: Box primitives for wall cells, sized to tile dimensions and wall height.
-- **Teleport markers**: Spheres slightly above the floor.
-- **Decorations**: Small clusters of simple primitives (cylinders, boxes, cones, torus, octahedrons, dodecahedrons) chosen per region theme.
+### Minimap examples
+![Minimap](./mapPath.png)
+![Map during gameplay with route](./mapDuringGameplay.png)
 
-All meshes are grouped into a single maze root group. This keeps updates and rebuilds simple when the user changes the maze theme.
+## 3. 3D world organization and geometric primitives
+The 3D world is built from small reusable primitives. Floor and ceiling tiles are generated from planes or thin box geometry. Walls are box primitives sized to the tile dimensions and wall height. Teleport markers are spheres slightly above the floor. Decorations are clusters of cylinders, boxes, cones, torus shapes, octahedrons, and dodecahedrons chosen per region theme.
 
-## Moving in 3D and visibility
-### Movement model
-- **Input and camera**: Mouse movement drives yaw and pitch, with pointer lock for first-person control. Keyboard input defines local movement, then rotates into world space by yaw.
-- **Predictive collision**: Movement is tested before committing. The player is represented as an upright box around the camera eye position. Each axis (X, Z, then Y) is resolved independently, producing natural wall sliding.
-- **Jump and gravity**: Jump adds vertical velocity, gravity integrates each frame, and the camera height is clamped to the grounded eye level when landing.
-- **Delta clamping**: The per-frame delta is clamped to avoid large jumps after tab switching or lag.
+All meshes are grouped under one maze root group. This keeps rebuilds simple when displacement is toggled. Window resizing is handled by updating the camera aspect ratio and renderer size, so the canvas continues to fill the browser window.
 
-### Frustum culling and hidden surface determination
-- **Frustum culling**: No custom culling is implemented. The engine relies on Three.js default object-level frustum culling, which skips rendering meshes outside the camera frustum.
-- **Hidden surface removal**: The GPU depth buffer (z-buffer) handles visibility between overlapping surfaces. Back-face culling is used by default for most materials; ceilings are rendered double-sided where needed.
+## 4. Moving in 3D and visibility
+Mouse movement drives yaw and pitch through pointer lock controls. Keyboard input defines local movement and is rotated into world space by the camera yaw. The implementation supports commonly used keyboard layouts: W/Z/ArrowUp for forward, S/ArrowDown for backward, A/Q/ArrowLeft for left movement, and D/ArrowRight for right movement. Mouse movement is used for looking around.
 
-Note: the Z-buffer used for hidden-surface removal is provided by the browser's WebGL implementation and used automatically by Three.js; its behavior can be adjusted per-material via `depthTest`/`depthWrite` and by toggling `material.side` or `material.transparent` when needed.
+Movement is tested before it is committed. The player is represented by an upright bounding box around the camera eye position. The controller queries the octree for nearby collision boxes and resolves movement axis by axis. Jumping and gravity are also handled in the controller, and frame delta is clamped so lag or tab switching does not cause large movement jumps.
 
-## Lighting choices
-The lighting is a layered setup that balances readability with atmosphere:
+For hidden-surface determination, the project mainly uses the standard Three.js/WebGL rendering pipeline. When surfaces overlap on screen, such as a wall in front of another object, the WebGL depth buffer decides which surface is closest to the camera and displays that one. Surfaces behind it are hidden automatically.
 
-- **Hemisphere light**: Provides a soft sky/ground gradient so surfaces never become fully black.
-- **Ambient light**: Adds a mild global lift to reduce harsh contrast.
-- **Local point lights**: Region decorations and special tiles spawn point lights with theme-colored tints. A small subset casts shadows for depth and visual focus.
-- **Emissive materials**: Teleport pads and special markers add emissive highlights that read well in darker corridors.
+Three.js also performs object-level frustum culling, which means that meshes completely outside the camera view are skipped. We did not add more advanced portal culling or BSP-based visibility because the maze is small enough for the default system. We briefly tested region-based and line-of-sight visibility for dynamic objects and lights to save some performance (more specifically for the displacement mapping), but this caused visible pop-in and light flickering when moving around corners and minimal performance gains, so it was not used in the final version.
 
-The renderer uses physically correct lighting, soft shadow maps, and ACES tone mapping to keep exposure consistent across themes.
+## 5. Lighting, reflections, and shadow trade-offs
+We intentionally chose a closed-off corridor experience with ceilings. This gave the game a more narrow atmosphere, but it also limited the lighting possibilities without making the scene expensive or too dark. "Hard shadowing" from every torch, LED lamp, crystal, ember, and teleport marker was not used as the main solution because the number of local light sources made it costly and caused the project to crash occasionally.
 
-## Texture mapping strategies
-Textures are generated procedurally and mapped in a world-aligned way:
+The final lighting setup is a bit more layered. The hemisphere and ambient lights keep corridors traversable with emissive lighting, a small player-following light prevents complete darkness, and local point lights from decorations add theme-colored lighting that reacts with the wall and floor materials. This made the textures feel more alive while keeping the maze playable. We made the teleport pads emissive and added a small point light to them, so they are visible from a distance and give a nice glow effect without needing expensive shadows.
 
-- **Procedural surface textures**: Albedo and bump maps are painted in code using patterns like brick, stone, panel, rock, and crystal. This avoids external asset dependencies and keeps themes consistent.
-- **World-aligned UVs**: UVs are computed from world-space positions instead of per-tile local UVs. This makes neighboring tiles line up seamlessly and prevents visible seams at tile borders.
-- **Tile-aware repetition**: Repeat factors are chosen per material family (walls vs floors) so the scale reads correctly in the maze.
-- **Special surfaces**: Start, goal, and teleport pads use emissive details and distinct patterns for legibility.
+Some reflection/specular highlights are still visible through walls on shiny textures (see the second image of the minimap example on the left-hand side of the image). We first tried a pop-in style structure where lights were activated based on line of sight, but that caused distracting flickering and sudden light changes when crossing corridors. We also considered screen-space reflections, a technique often used in games, but it gave inconsistent results, especially when looking at the floor, in a closed maze because it only works with visible screen information. A solution to include the occluded geometry was to explicitly configure shadow-casting for objects and the light sources, but this increased the overall darkness and cost of the initial maze build. We left the remaining reflection artifacts because it adds some brightness to a closed-ceiling map that would otherwise become too dark. 
 
-## Octree build time and optimization ideas
-**Measured build time:** Ran on laptop with an Intel i5-13420H and 24GB DDR5 RAM. Times are averages over 100 runs per maze size.
+Thus, the code still contains shadow settings for main meshes and a limited number of light sources, but shadow casting is deliberately restricted to a minimum. This was a trade-off between visual depth, performance, and traversability.
 
-**Benchmark results:**
+## 6. Texture mapping, bump mapping, and displacement
+Textures are loaded through texture-map descriptors. These descriptors define which maps belong to each material, including diffuse/base color, normal, ambient occlusion, roughness, specular, metalness, emissive, and displacement/height maps. Not every texture uses every map, but the system supports them so each theme can have different surface behavior.
 
-| (index) | size | runs | mean_ms | mean_us | std_ms | min_ms | max_ms |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 10 | 100 | 0.000000 | 0 | 0.000000 | 0.000000 | 0.000000 |
-| 1 | 100 | 100 | 0.060000 | 60 | 0.237487 | 0.000000 | 1.000000 |
-| 2 | 1000 | 100 | 0.600000 | 600 | 0.616441 | 0.000000 | 2.000000 |
-| 3 | 10000 | 100 | 5.870000 | 5870 | 1.689112 | 4.000000 | 14.000000 |
-| 4 | 100000 | 100 | 76.110000 | 76110 | 7.356487 | 64.000000 | 105.000000 |
+Normal maps are used to make bricks, rocks, panels, ice, and floor tiles look deeper without changing the actual geometry. Ambient occlusion maps darken small cracks and surface details, while roughness and specular maps control how matte or shiny materials appear.
 
-Notes:
-- The octree is built once per maze creation from wall collision boxes.
-- Build cost scales with the number of wall tiles and the chosen depth/thresholds.
+World-aligned UVs were used so neighbouring wall and floor tiles line up more naturally and show fewer seams between them. Displacement mapping was added as an optional feature: it physically moves vertices using height maps, giving stronger depth than normal mapping. However, it is more expensive because floors, walls, and ceilings need extra subdivisions to make this work. Edge displacement also had to be faded or locked near tile borders to avoid intersections or visible gaps between neighbouring tiles.
 
-Ideas for further speedups:
-- Merge adjacent wall tiles into larger boxes to reduce entry count.
-- Use a loose octree so items that touch split planes can still be pushed deeper.
-- Build the tree in a Web Worker to avoid blocking the main thread during rebuilds.
-- Switch to a fixed uniform grid for very regular, grid-aligned mazes.
-- Cache and reuse octree nodes when only textures/themes change.
+### Displacement comparison
+![Displacement close-up](./displacementOn.png)
+![Displacement off](./displacementOff.png)
 
-## Collision detection with the octree
-Collision is handled in two phases:
+## 7. Collision detection with the octree
+Collision is handled in two phases. First, the player bounding box queries the octree to retrieve only nearby wall, ceiling, and object boxes. Second, exact AABB intersection tests are performed against those candidates. This is much faster than testing every wall and decoration every frame in a "simple implementation".
 
-1. **Broad phase**: The player bounding box queries the octree to retrieve only nearby wall boxes.
-2. **Narrow phase**: Exact AABB intersection tests are performed against those candidates.
+The octree starts with a root bounding box around all collision entries. When a node contains too many entries and the maximum depth is not reached, it subdivides into eight child boxes. Entries are pushed deeper only if they fit fully inside one child, otherwise, they stay in the parent. This is safer for collision because objects that cross split planes cannot be missed.
 
-The axis-by-axis resolution (X then Z then Y) prevents sticking and produces smooth wall sliding. This approach is simple, stable, and fast for tile-based worlds.
+A key lesson in our implementation was that collision quality depended more on the inserted boxes than on the octree itself. Full tile boxes are correct for walls, but decorations need smaller collision boxes so the player can still walk on tiles containing props. In an early implementation, tiles became blocked by larger decoration which made passage sometimes impossible if it was situated on a narrow corridor. We switched to smaller boxes for decorations, and we also made sure to exclude purely visual objects that the player should be able to walk through, such as glowing embers, flame meshes, LED glows and particles.
 
-## Ray tracing using the octree (optional)
+## 8. Octree build time and optimization ideas
+The octree is built once when the maze is created or rebuilt. The benchmark was run on a laptop with an Intel i5-13420H and 24 GB DDR5 RAM, using 100 runs per maze size.
+
+| Size | Runs | Mean ms | Mean us | Std ms | Min ms | Max ms |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10 | 100 | 0.000 | 0 | 0.000 | 0.000 | 0.000 |
+| 100 | 100 | 0.060 | 60 | 0.237 | 0.000 | 1.000 |
+| 1000 | 100 | 0.600 | 600 | 0.616 | 0.000 | 2.000 |
+| 10000 | 100 | 5.870 | 5870 | 1.689 | 4.000 | 14.000 |
+| 100000 | 100 | 76.110 | 76110 | 7.356 | 64.000 | 105.000 |
+
+Possible speedups include merging adjacent wall tiles into larger boxes, reducing decoration collision entries in the octree, building the tree in a Web Worker which allows for background processing. Caching/reusing nodes when only textures change, or switching to a fixed uniform grid for this regular tile-based world, meaning that each tile corresponds to one grid cell, because the maze is divided into a grid of cells and the walls that will stay in the same place.
+
+## 9. Octree compared to kd-tree and BSP-tree
+An octree fits this project because the maze is axis-aligned, grid-based, and made mostly from box-like primitives. AABB queries are simple, rebuilding is straightforward, and the implementation is easy to debug. We would definitely use an octree for voxel worlds, blocky levels, grid-based mazes, or other relatively regular 3D scenes where broad-phase collision queries are needed.
+
+Its limitation is that it subdivides space uniformly. This works well for our regular tile-based maze, but it is less efficient for long, thin objects or unevenly distributed geometry because many objects may stay high in the tree. A kd-tree can adapt its splits better to uneven data, while a BSP tree can be better for complex static indoor scenes with portal-style visibility (= “which rooms can the camera see through which doors?”). We would avoid an octree for highly non-uniform scenes, large irregular geometry sets, or projects where advanced visibility/portal culling is the main goal.
+
+## 10. Ray tracing using the octree (optional)
 **Status:** Not implemented in the current project.
 
 Planned approach:
@@ -124,41 +112,12 @@ Planned approach:
 - Visit children in order of entry distance to allow early exit on first hit.
 
 Expected complexity:
-- Average: $O(\log n + k)$, where $k$ is the number of candidate primitives tested.
-- Worst case: $O(n)$ if the ray intersects many nodes or the tree becomes unbalanced.
+- Average: O(log n + k), where k is the number of candidate primitives tested.
+- Worst case: O(n) if the ray intersects many nodes or the tree becomes unbalanced.
 
-## Octree vs kd-tree and BSP-tree
-**Why an octree was a good fit here**
-- The maze is axis-aligned and grid-based, which matches an octree's axis-aligned subdivision.
-- Insertion is simple and supports rebuilds when the maze is regenerated.
-- Querying with an AABB (player box) is straightforward and fast in practice.
+## 11. Challenges and lessons learned
+Predictive collision worked better than pushing the player out after a collision (something we tried earlier). When multiple walls overlapped, push-out correction would feel unstable because it created a "bouncing" effect as the player was pushed out of one wall and sometimes immediately collided with another. Checking the movement first and only applying it when valid gave smoother "wall sliding".
 
-**When I would definitely use an octree**
-- Axis-aligned, relatively uniform 3D spaces (grid mazes, voxel worlds, blocky environments).
-- When I need fast broad-phase queries with simple implementation and rebuilds.
+Tile-local UVs created visible seams between tiles. World-aligned UVs made the textures continue more naturally across floors and walls. Displacement mapping also improved the look, but only after adding enough geometry and controlling the displacement near edges. Because it is heavier than normal mapping, it was kept optional.
 
-**Limitations compared to kd-tree and BSP-tree**
-- Octrees subdivide space uniformly, which can waste nodes in uneven distributions.
-- Items that cross split planes stay higher in the tree, reducing pruning effectiveness.
-- kd-trees can adapt splits to data distribution, often improving query efficiency for non-uniform scenes.
-- BSP trees can split along polygon planes and are excellent for static indoor scenes with complex occlusion and visibility calculations.
-
-**When I would avoid an octree**
-- Highly non-uniform scenes with long, thin geometry where adaptive splits matter.
-- Static indoor levels where BSP-style visibility or portal culling is a priority.
-- Large point clouds or irregular geometry sets where a kd-tree provides better balance.
-
-## Challenges and lessons learned
-- **Predictive collision vs push-out correction**: Pushing the player out of walls caused unstable corrections when multiple walls overlapped. Predictive collision (rejecting invalid moves) was more stable and easier to reason about.
-- **UV alignment**: Tile-local UVs made seams obvious. World-aligned UVs fixed this and made the maze feel continuous.
-- **Connectivity**: Random room placement can isolate regions. Teleport-based reconnect logic ensured the maze stayed fully traversable.
-
-## Images
-
-![Figure 1: Overall maze view](images/figure-01.png)
-![Figure 2: First-person corridor view](images/figure-02.png)
-![Figure 3: Room with decorations and local lights](images/figure-03.png)
-![Figure 4: Minimap with route overlay](images/figure-04.png)
-![Figure 5: Teleport pads in-world](images/figure-05.png)
-![Figure 6: Theme comparison grid](images/figure-06.png)
-![Figure 7: Material close-ups](images/figure-07.png)
+Lighting was the hardest visual problem. Since the maze is closed off with corridors and ceilings, it can become too dark very quickly. However, too many realtime shadows or screen-space effects caused performance issues and visual inconsistencies. The final lighting therefore focuses on a more readable navigation, dynamic local lights, and more distinct theme atmosphere instead of fully realistic shadows from every light source.

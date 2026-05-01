@@ -39,6 +39,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return geometry;
     }
 
+    // Some geometries used for the map themes
     const geometries = {
         pedestal: registerGeometry(new THREE.CylinderGeometry(tileSize * 0.16, tileSize * 0.22, tileSize * 0.24, 16)),
         plinth: registerGeometry(new THREE.BoxGeometry(tileSize * 0.5, tileSize * 0.2, tileSize * 0.5)),
@@ -79,6 +80,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return `${x},${y}`;
     }
 
+    // Again this is used for line-of-sight checks for light visibility.
     function getSupercoverLineCells(startCell, endCell, target = [])
     {
         target.length = 0;
@@ -199,6 +201,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return t * t * (3 - 2 * t);
     }
 
+    // We left this in the code but removed the use as it resulted in flickering of lights when moving around the map
     function updateOcclusionTrackedLights(force = false)
     {
         if (occlusionTrackedLights.length === 0)
@@ -257,6 +260,9 @@ function createMazeWorldDecorations(maze, layout, options = {})
     }
 
 
+    // Called every frame to smoothly change tracked light brightness.
+    // The target brightness is set in updateOcclusionTrackedLights.
+    // Exponential smoothing keeps the fade smooth even when the frame rate changes.
     function applyOcclusionLightSmoothing(delta)
     {
         if (occlusionTrackedLights.length === 0)
@@ -483,7 +489,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return bestCell;
     }
 
-    // Ensures corridor decorations stay sparse while rooms almost always get a focal point.
+    // Ensures corridor decorations stay sparse while rooms almost always get decorated, as long as they are big enough to not look cluttered.
     function shouldDecorateRegion(region)
     {
         if (region.kind === "room")
@@ -500,6 +506,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         const mesh = new THREE.Mesh(geometry, material);
         const receiveShadow = options.receiveShadow ?? true;
 
+        // Some of the shadow settings were limited as it became rather performance-heavy with all the different light sources
         mesh.position.copy(position);
         mesh.receiveShadow = receiveShadow;
         mesh.castShadow = options.castShadow ?? receiveShadow;
@@ -565,6 +572,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return light;
     }
 
+    // Counts how many of the currently placed lights are shadow-casting, so we can keep track of the shadow budget.
     function countPlacedShadowCastingLights()
     {
         let count = 0;
@@ -580,6 +588,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return count;
     }
 
+    // Configures shadow settings for a point light.
     function configurePointLightShadow(light, options = {})
     {
         if (!options.castShadow)
@@ -599,6 +608,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return light;
     }
 
+    // Creates a decorative mesh that also emits light and has a built-in bobbing animation, so we can add more life to the scenes without needing many separate light sources.
     function createAnimatedEmitter(geometry, material, position, options = {})
     {
         const emitter = createDecorMesh(
@@ -667,6 +677,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
             }
         }
 
+        // The animation is purely visual and does not affect the actual light position or intensity, so we can keep it separate from the occlusion management and it will not cause any popping of light when moving around.
         emitter.userData.updateEmitter = (delta) =>
         {
             emitter.userData.animationTime += delta;
@@ -697,6 +708,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return emitter;
     }
 
+    // Determines whether a decorative accent should be placed on a floor tile, based on the theme, region kind, and some randomness to avoid overpopulation.
     function shouldPlaceTileAccent(cell, interval, salt)
     {
         if (
@@ -716,12 +728,14 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return ((value >>> 0) % densityInterval) === 0;
     }
 
+    // Keeps track of how many decorative lights with local illumination have been placed, so we can limit the number of them per map and avoid overloading the scene with too many light sources.
     function claimAmbientTileLight()
     {
         placedAmbientTileLights++;
         return true;
     }
 
+    // Creates a decorative prop with an optional light source on top of a floor tile, based on the theme family and some randomness. These accents help make the floor tiles feel less empty and add more character to the different themes.
     function createThemeTileAccent(cell)
     {
         const themeFamily = inferThemeFamily(cell.themeName ?? cell.floorType ?? "neutral");
@@ -911,8 +925,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
                         {
                             lightColor: "#ff8a1f",
                             // Let all three ember meshes contribute a small glow instead of only
-                            // the first one lighting the tile. The total intensity stays close to
-                            // the old single-light value, so the fire cave does not become brighter overall.
+                            // the first one lighting the tile.
                             lightIntensity: hasLight ? 3.2 : 0,
                             lightDistance: tileSize * 7.6,
                             baseScale: 0.2 + random() * 0.12,
@@ -977,9 +990,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
                 }
             );
 
-            // Make the moving ice-cave accent read as a small crystal instead of a round orb.
-            // The point light is still attached inside the emitter, but the visible mesh is now
-            // an angular shard with a taller crystal-like silhouette.
+            // Make the moving ice-cave accent read as a small crystal.
             floatingCrystal.scale.y *= 1.75;
             floatingCrystal.rotation.x = random() * Math.PI;
             floatingCrystal.rotation.z = random() * Math.PI;
@@ -1074,7 +1085,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         };
     }
 
-    // Industrial sections use storage props and colder task lighting.
+    // Industrial sections use storage props and colder LED lighting.
     function addIndustrialDecoration(targetGroup, palette, variant, sourceCell)
     {
         const cabinetMaterial = getMaterial("industrial:cabinet", {
@@ -1462,11 +1473,6 @@ function createMazeWorldDecorations(maze, layout, options = {})
 
         const lightAnchor = new THREE.Vector3(0, tileSize * 0.52, 0);
 
-        // Extra ice spikes were removed. They cluttered the ice map,
-        // added unnecessary draw calls, and could cast confusing shadows.
-
-        // Keep only the main beacon crystal on the central stone object.
-
         targetGroup.add(
             createDecorMesh(
                 geometries.beaconCrystal,
@@ -1717,6 +1723,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return embers;
     }
 
+    // Gathers collision boxes and types for all collidable meshes in the decoration group
     function collectCollisionEntries()
     {
         const collisionEntries = [];
@@ -1883,6 +1890,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return materialCache.get("staticSoftShadow:floor");
     }
 
+    // Determines if an object should cast a static soft shadow based on its properties and userData flags.
     function isStaticSoftShadowCaster(object)
     {
         if (!object?.isMesh)
@@ -1903,6 +1911,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return object.castShadow === true && object.material?.transparent !== true;
     }
 
+    // Collects world positions and relevant properties of all static light sources in the group for shadow placement.
     function collectStaticLightPositions()
     {
         const lights = [];
@@ -1927,6 +1936,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return lights;
     }
 
+    // Finds the nearest static light source to a given position, weighted by distance and light intensity, and ignoring lights that are too far away to cast a shadow.
     function findNearestShadowLight(casterPosition, lights)
     {
         let bestLight = null;
@@ -1954,6 +1964,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return bestLight;
     }
 
+    // Adds pre-rendered soft shadow decals for static objects based on nearby static light sources, up to a reasonable limit to avoid impact on performance
     function addPreRenderedSoftShadows()
     {
         const lights = collectStaticLightPositions();
@@ -2073,6 +2084,7 @@ function createMazeWorldDecorations(maze, layout, options = {})
         return materialCache.get("staticSoftShadow:wallContact");
     }
 
+    // Adds additional soft shadow decals along the edges of walls where they meet the floor to help visually anchor them, up to a reasonable limit to avoid impact on performance
     function addWallContactSoftShadows()
     {
         const material = getWallContactShadowMaterial();

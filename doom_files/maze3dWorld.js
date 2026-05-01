@@ -36,14 +36,17 @@ function buildMazeWorldFromData(maze, options = {})
     const sphereRadius = options.teleportSphereRadius ?? tileSize * 0.28;  // Sphere is temporarily used to visualize the transportation points.
     const sphereY = floorY + floorThickness / 2 + sphereRadius + 0.08;
 
-    // This group holds the maze meshes (still temporary)
-    const group = new THREE.Group();  // Likely to change when handling collisions
+    // This group holds the maze meshes
+    const group = new THREE.Group();
     group.name = "mazeWorld";
     group.userData.mazeLayout = layout;
     group.userData.trackedPlayer = null;
 
     // Displacement needs enough vertices to follow the real height texture. Too few segments
     // create large, soft bumps instead of tile/brick-level depth.
+    // ToNonIndexed gives each triangle its own vertices so the shader can displace them independently.
+    // This impacts performance, but gave better visual results when displacement is enabled as it focuses less on
+    // smoothing shared vertices across neighbouring faces and keeps the displaced detail more local to each surface.
     const geometrySegments = textureDisplacementEnabled ? 32 : 1;
     const wallHeightSegments = textureDisplacementEnabled ? 18 : 1;
     const floorGeometry = new THREE.PlaneGeometry(
@@ -177,7 +180,7 @@ function buildMazeWorldFromData(maze, options = {})
         teleportLight.shadow.camera.far = tileSize * 6;
         sphere.add(teleportLight);
 
-        // Simple animation (still TODO)
+        // Simple animation
         sphere.tick = (delta) =>
         {
             sphere.rotation.y += delta * 2.5;
@@ -196,6 +199,9 @@ function buildMazeWorldFromData(maze, options = {})
         return color;
     }
 
+    // Some of these settings are leftovers of previous configurations that used visibility to determine if an object
+    // should be rendered at all, but we removed them as it resulted in many flickering
+    // We still left it in for a possible later extension.
     const teleportColorById = new Map();
     const renderVisibilityEntries = [];
     const visibleCellKeys = new Set();
@@ -248,6 +254,8 @@ function buildMazeWorldFromData(maze, options = {})
         };
     }
 
+    // This was a leftover from a previous configuration where we added holes in the ceiling
+    // We left this in for possible future re-use
     function hasSkylightOpening(x, y, currentCell)
     {
         return false;
@@ -271,6 +279,7 @@ function buildMazeWorldFromData(maze, options = {})
         });
     }
 
+    // Gets the cells that lie on the supercover line between two cells. This is used to determine which cells are intersected by a line of sight for visibility calculations.
     function getSupercoverLineCells(startCell, endCell, target = visibilityScratchCells)
     {
         target.length = 0;
@@ -441,6 +450,7 @@ function buildMazeWorldFromData(maze, options = {})
         }
     }
 
+    // This was a leftover from a previous configuration. This function was used to determine which cells should be rendered at all based on visibility, but we removed that as it resulted in many flickering. We left it in for a possible later extension.
     function buildVisibilityProbeKey(playerCell)
     {
         return collectVisibilityProbeCells(playerCell)
@@ -527,6 +537,7 @@ function buildMazeWorldFromData(maze, options = {})
         }
     }
 
+    // This was a leftover from a previous configuration where we pre-warmed the visibility cache around the starting area to reduce initial pop-in. We left it in for a possible later extension.
     function startVisibilityCacheWarmup()
     {
         const warmupQueue = [];
